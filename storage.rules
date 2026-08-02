@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isImageFile() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isUnder5MB() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // =====================
+    // User profile images
+    // =====================
+    match /users/{userId}/profile/{filename} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId)
+                   && isImageFile()
+                   && isUnder5MB();
+    }
+
+    // =====================
+    // Game assets (public read)
+    // =====================
+    match /assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if false; // Only writable via Admin SDK
+    }
+
+    // =====================
+    // Deny all other access
+    // =====================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
