@@ -44,15 +44,13 @@ const MusicContext = createContext<MusicContextType | null>(null);
 
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
-  // Account-scoped storage key: unique for each user/email
   const userKey = currentUser?.uid || currentUser?.email || 'guest';
 
-  // Load tracks specific to this user/email
   const loadUserTracks = useCallback((key: string): MusicTrack[] => {
     if (key === 'guest') return [];
     try {
       const raw = localStorage.getItem(`cosmicbone_music_playlist_${key}`);
-      if (!raw) return []; // New accounts start with zero music added!
+      if (!raw) return [];
       const parsed = JSON.parse(raw) as MusicTrack[];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
@@ -74,7 +72,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const playerRef = useRef<any>(null);
 
-  // Automatically switch playlist when logged in user / account changes
   useEffect(() => {
     const loaded = loadUserTracks(userKey);
     setTracks(loaded);
@@ -84,7 +81,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentTime(0);
   }, [userKey, loadUserTracks]);
 
-  // Save tracks to user's isolated local storage playlist
   const saveUserTracks = (newTracks: MusicTrack[]) => {
     setTracks(newTracks);
     if (userKey !== 'guest') {
@@ -241,17 +237,33 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           url={currentTrack?.audioUrl}
           playing={isPlaying}
           volume={isMuted ? 0 : volume}
+          playsinline={true}
           onProgress={(state: any) => {
             setProgress(state.played);
             setCurrentTime(state.playedSeconds);
+            if ('mediaSession' in navigator && duration > 0) {
+              try {
+                navigator.mediaSession.setPositionState({
+                  duration: Math.max(duration, state.playedSeconds),
+                  playbackRate: 1,
+                  position: state.playedSeconds,
+                });
+              } catch {}
+            }
           }}
           onDuration={(d: number) => setDuration(d)}
           onEnded={handleNext}
           width="1px"
           height="1px"
           config={{
+            file: {
+              attributes: {
+                playsInline: true,
+                controlsList: 'nodownload',
+              }
+            },
             youtube: {
-              playerVars: { showinfo: 1 } as any
+              playerVars: { showinfo: 1, playsinline: 1 } as any
             }
           } as any}
         />
