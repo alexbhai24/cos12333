@@ -8,6 +8,22 @@ export interface UserProfileDoc {
   role: UserRole;
   createdAt: string;
   updatedAt: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  name?: string;
+  photoUrl?: string;
+  gender?: 'male' | 'female';
+  userType?: 'student' | 'teacher';
+  gradeLevel?: StableGrade | string;
+  teacherDesignation?: StableTeacherDesignation | string;
+  decoration?: 'orbit' | 'energy' | 'rings' | 'flame' | 'glitch' | 'shield' | 'supernova' | 'web' | 'none';
+  setupComplete?: boolean;
+  apples?: number;
+  streak?: number;
+  streakFreezes?: number;
+  streakHistory?: string[];
+  frozenDates?: string[];
 }
 
 export type Theme =
