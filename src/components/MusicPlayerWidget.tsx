@@ -81,7 +81,7 @@ const EditPanel: React.FC<EditPanelProps> = ({ track, onSave, onDelete, onClose 
         {[
           { label: 'Title', val: title, set: setTitle, placeholder: 'Track title...', required: true },
           { label: 'Artist / Subtitle', val: artist, set: setArtist, placeholder: 'Artist name...' },
-          { label: 'Audio URL (YouTube / direct link)', val: audioUrl, set: setAudioUrl, placeholder: 'https://... (mp3, youtube url, soundcloud)', required: true },
+          { label: 'Audio URL (mp3 / youtube)', val: audioUrl, set: setAudioUrl, placeholder: 'https://... (mp3, youtube url, soundcloud)', required: true },
           { label: 'Image URL', val: imageUrl, set: setImageUrl, placeholder: 'https://... (jpg, png, webp)' },
         ].map(({ label, val, set, placeholder, required }) => (
           <div key={label} className="space-y-1.5">
@@ -95,6 +95,11 @@ const EditPanel: React.FC<EditPanelProps> = ({ track, onSave, onDelete, onClose 
               placeholder={placeholder}
               className="w-full bg-[#111827] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[var(--color-cyan)]/60 transition-colors"
             />
+            {label.includes('Audio URL') && (
+              <p className="text-[9.5px] text-amber-500/90 leading-tight mt-1 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                ⚠️ <strong className="text-amber-400">Mobile Tip:</strong> Phones block YouTube videos in the background. For mobile background play, you MUST paste a direct <strong className="text-amber-400">.mp3 audio link</strong>!
+              </p>
+            )}
           </div>
         ))}
       </div>
