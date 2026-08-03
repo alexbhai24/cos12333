@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import _ReactPlayer from 'react-player';
 import { useAuth } from './AuthContext';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const ReactPlayer = (_ReactPlayer as any).default || _ReactPlayer;
 
@@ -44,21 +46,10 @@ const MusicContext = createContext<MusicContextType | null>(null);
 
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
+  // Account-scoped storage key: unique for each user/email
   const userKey = currentUser?.uid || currentUser?.email || 'guest';
 
-  const loadUserTracks = useCallback((key: string): MusicTrack[] => {
-    if (key === 'guest') return [];
-    try {
-      const raw = localStorage.getItem(`cosmicbone_music_playlist_${key}`);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw) as MusicTrack[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, []);
-
-  const [tracks, setTracks] = useState<MusicTrack[]>(() => loadUserTracks(userKey));
+  const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -72,19 +63,53 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const playerRef = useRef<any>(null);
 
+  // Automatically switch playlist and fetch from Firestore when logged in user / account changes
   useEffect(() => {
-    const loaded = loadUserTracks(userKey);
-    setTracks(loaded);
+    let active = true;
+    const fetchTracks = async () => {
+      if (userKey === 'guest') {
+        if (active) setTracks([]);
+        return;
+      }
+      try {
+        // Try local storage first for instant load
+        const raw = localStorage.getItem(`cosmicbone_music_playlist_${userKey}`);
+        if (raw && active) {
+          const parsed = JSON.parse(raw) as MusicTrack[];
+          if (Array.isArray(parsed)) setTracks(parsed);
+        }
+        
+        // Then sync from Firestore
+        const ref = doc(db, 'user_music_playlists', userKey);
+        const snap = await getDoc(ref);
+        if (snap.exists() && active) {
+          const remoteTracks = snap.data().tracks;
+          if (Array.isArray(remoteTracks)) {
+            setTracks(remoteTracks);
+            localStorage.setItem(`cosmicbone_music_playlist_${userKey}`, JSON.stringify(remoteTracks));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load music tracks from Firestore', err);
+      }
+    };
+    
+    fetchTracks();
     setCurrentIdx(0);
     setIsPlaying(false);
     setProgress(0);
     setCurrentTime(0);
-  }, [userKey, loadUserTracks]);
+    
+    return () => { active = false; };
+  }, [userKey]);
 
+  // Save tracks to user's isolated local storage playlist and Firestore
   const saveUserTracks = (newTracks: MusicTrack[]) => {
     setTracks(newTracks);
     if (userKey !== 'guest') {
       localStorage.setItem(`cosmicbone_music_playlist_${userKey}`, JSON.stringify(newTracks));
+      setDoc(doc(db, 'user_music_playlists', userKey), { tracks: newTracks }, { merge: true })
+        .catch(err => console.error('Failed to save tracks to Firestore', err));
     }
   };
 
