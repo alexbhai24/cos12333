@@ -14,8 +14,8 @@ async function getIdToken(): Promise<string> {
 }
 
 /**
- * Called on every login/signup. Creates the users/{uid} Firestore document
- * if it doesn't exist via the server endpoint, which also sets Auth custom claims.
+ * Called on every login/signup. Creates or fetches the users/{uid} Firestore document
+ * so profiles persist across all mobile devices and browsers.
  */
 export async function ensureProfile(): Promise<UserProfileDoc> {
   const user = auth.currentUser;
@@ -23,28 +23,23 @@ export async function ensureProfile(): Promise<UserProfileDoc> {
 
   const isFixedAdmin = user.email?.toLowerCase().trim() === 'rajanandalex1@gmail.com';
 
+  // 1. Fetch from Firestore first so profiles sync across all devices & browsers
   try {
-    const token = await getIdToken();
-    const res = await fetch(`${API_BASE}/api/auth/ensure-profile`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    }).catch(() => null);
+    const userDocRef = doc(db, 'users', user.uid);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      const data = snap.data() as UserProfileDoc;
+      if (isFixedAdmin) data.role = 'admin';
 
-    if (res && res.ok) {
-      const data = await res.json();
-      if (data.created) {
-        await auth.currentUser?.getIdToken(true);
-      }
-      return data.profile as UserProfileDoc;
+      const storedKey = `cosmicbone_profile_${user.uid}`;
+      localStorage.setItem(storedKey, JSON.stringify(data));
+      return data;
     }
   } catch (err) {
-    console.warn('[userProfileService] API ensure-profile offline, using local profile fallback.');
+    console.warn('[userProfileService] Firestore read failed during ensureProfile:', err);
   }
 
-  // Graceful local profile fallback when standalone auth server is unreached
+  // 2. Check localStorage fallback if offline
   const storedKey = `cosmicbone_profile_${user.uid}`;
   const stored = localStorage.getItem(storedKey);
   if (stored) {
@@ -55,15 +50,23 @@ export async function ensureProfile(): Promise<UserProfileDoc> {
     } catch (e) {}
   }
 
+  // 3. Document doesn't exist yet -> Create in Firestore
   const fallbackProfile: UserProfileDoc = {
     uid: user.uid,
     email: user.email || '',
     displayName: user.displayName || user.email?.split('@')[0] || 'User',
     photoURL: user.photoURL || '',
     role: isFixedAdmin ? 'admin' : 'student',
+    setupComplete: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
+  try {
+    await setDoc(doc(db, 'users', user.uid), fallbackProfile, { merge: true });
+  } catch (err) {
+    console.warn('[userProfileService] Failed to write initial profile to Firestore:', err);
+  }
 
   localStorage.setItem(storedKey, JSON.stringify(fallbackProfile));
   return fallbackProfile;
@@ -80,8 +83,6 @@ export async function getProfile(uid: string): Promise<UserProfileDoc | null> {
 
 /**
  * Update (or create) the current user's profile in Firestore.
- * Uses setDoc with merge:true so it works even when the document doesn’t exist yet.
- * Protected fields (role, uid, email, createdAt) are blocked by Firestore security rules.
  */
 export async function updateProfile(
   uid: string,
