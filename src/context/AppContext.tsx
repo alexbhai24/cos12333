@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type {
   Theme,
   BackgroundType,
@@ -108,7 +108,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
 
-  const { currentUser, userRole } = useAuth();
+  const { currentUser, authLoading, pendingVerificationEmail, userRole, userProfile } = useAuth();
 
   const [user, setUser] = useState<UserProfile>(() => profileService.getProfile());
   const [selectedGrade, setSelectedGradeState] = useState<string>(() => normalizeGrade(user.gradeLevel));
@@ -157,7 +157,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Subscribe to Firestore posts in real-time
   useEffect(() => {
     const unsubscribe = postService.subscribe((firestorePosts) => {
-      // Mark which posts the current user has liked
       const uid = currentUser?.uid;
       const enriched = firestorePosts.map(p => ({
         ...p,
@@ -168,7 +167,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return unsubscribe;
   }, [currentUser]);
 
-  // Sync Firebase Auth user + server-backed role into local UserProfile
+  // Sync Firebase Auth user + Firestore userProfile into local UserProfile state
   useEffect(() => {
     if (currentUser) {
       const email = currentUser.email?.toLowerCase().trim();
@@ -176,20 +175,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const isAdmin = isFixedAdmin || userRole === 'admin';
       const userType = isAdmin ? 'teacher' : (userRole === 'teacher' ? 'teacher' : 'student');
       
-      // Load the actual current profile from local storage using the correct key (since currentUser is now set)
       const currentProfile = profileService.getProfile();
+      const fp = userProfile;
 
-      const updated = profileService.saveProfile({
-        name: (currentProfile.name && currentProfile.name !== 'New Student') ? currentProfile.name : (currentUser.displayName || currentProfile.name),
+      const mergedData: Partial<UserProfile> = {
+        name: fp?.displayName || fp?.name || currentProfile.name || currentUser.displayName || undefined,
+        firstName: fp?.firstName || currentProfile.firstName,
+        lastName: fp?.lastName || currentProfile.lastName,
+        username: fp?.username || currentProfile.username,
         email: currentUser.email || currentProfile.email,
-        photoUrl: (currentProfile.photoUrl && !currentProfile.photoUrl.startsWith('gradient:astronaut')) ? currentProfile.photoUrl : (currentUser.photoURL || currentProfile.photoUrl),
+        photoUrl: fp?.photoUrl || fp?.photoURL || currentProfile.photoUrl || currentUser.photoURL || 'gradient:astronaut',
+        gender: (fp?.gender as any) || currentProfile.gender,
+        gradeLevel: (fp?.gradeLevel as any) || currentProfile.gradeLevel,
+        teacherDesignation: (fp?.teacherDesignation as any) || currentProfile.teacherDesignation,
+        decoration: (fp?.decoration as any) || currentProfile.decoration,
+        setupComplete: fp?.setupComplete ?? currentProfile.setupComplete,
+        apples: fp?.apples ?? currentProfile.apples,
+        streak: fp?.streak ?? currentProfile.streak,
+        streakFreezes: fp?.streakFreezes ?? currentProfile.streakFreezes,
+        streakHistory: fp?.streakHistory || currentProfile.streakHistory,
+        frozenDates: fp?.frozenDates || currentProfile.frozenDates,
         isAdmin,
         userType,
-      });
+      };
+
+      const updated = profileService.saveProfile(mergedData);
       setUser(updated);
       setSelectedGradeState(normalizeGrade(updated.gradeLevel));
     }
-  }, [currentUser, userRole]);
+  }, [currentUser, userRole, userProfile]);
 
   const claimDailyStreak = () => {
     if (!user || !user.email) return;
@@ -271,7 +285,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedGradeState(normalizeGrade(newProfile.gradeLevel));
     }
 
-    // Sync to Firebase Auth and Firestore
     if (auth.currentUser) {
       const targetName = updated.name || `${updated.firstName || ''} ${updated.lastName || ''}`.trim();
       const targetPhoto = updated.photoUrl || '';
@@ -287,8 +300,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).catch(err => console.error('[AppContext] Failed to update Auth profile:', err));
 
       updateFirestoreProfile(auth.currentUser.uid, {
+        uid: auth.currentUser.uid,
+        email: auth.currentUser.email || updated.email,
         displayName: targetName,
+        name: targetName,
+        firstName: updated.firstName || '',
+        lastName: updated.lastName || '',
+        username: updated.username || '',
         photoURL: targetPhoto,
+        photoUrl: targetPhoto,
+        gender: updated.gender || 'male',
+        userType: updated.userType || 'student',
+        gradeLevel: updated.gradeLevel || 'pcb',
+        teacherDesignation: updated.teacherDesignation || '',
+        decoration: updated.decoration || 'none',
+        setupComplete: updated.setupComplete ?? true,
+        apples: updated.apples ?? 100,
+        streak: updated.streak ?? 1,
+        streakFreezes: updated.streakFreezes ?? 1,
+        streakHistory: updated.streakHistory || [],
+        frozenDates: updated.frozenDates || [],
         role: targetRole as any,
       }).catch(err => console.error('[AppContext] Failed to update Firestore profile:', err));
     }
@@ -342,7 +373,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPost = (title: string, content: string, category: Post['category'], tags: string[], mediaUrl?: string) => {
-    // If running without Firebase Auth, fallback to local user profile for authorId
     const authorId = currentUser?.uid || user?.email || `local-user-${Date.now()}`;
     
     const newPostObj: any = {
@@ -359,7 +389,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newPostObj.mediaUrl = mediaUrl;
     }
 
-    // Optimistic UI Update
     const optimisticPost: Post = {
       ...newPostObj,
       id: `local-${Date.now()}`,
@@ -384,7 +413,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deletePost = (postId: string) => {
-    // Optimistic UI update
     setPosts(prev => prev.filter(p => p.id !== postId));
     postService.deletePost(postId).then(() => {
       showNotification('Post deleted 🗑️');
