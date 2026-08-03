@@ -1,6 +1,6 @@
 /**
  * focusClockService.ts
- * Offline-first state machine for Focus Clock with Firestore Cloud Persistence.
+ * Offline-first state machine for Focus Clock.
  * Uses deadline-based timing (targetEpoch) so the countdown stays
  * accurate across tab switches, browser throttling, and page refreshes.
  */
@@ -16,6 +16,7 @@ export interface FocusTag {
   loops?: number;
   mode?: "pomodoro" | "stopwatch";
 }
+
 
 export interface FocusSession {
   id: string;
@@ -197,10 +198,10 @@ export const focusClockService = {
     const nextKey = key || 'guest';
     if (activeUserKey !== nextKey) {
       activeUserKey = nextKey;
+      if (nextKey !== 'guest') {
+        loadFromFirestore(nextKey);
+      }
       listeners.forEach((cb) => cb());
-    }
-    if (nextKey !== 'guest') {
-      loadFromFirestore(nextKey);
     }
   },
 
@@ -266,7 +267,7 @@ export const focusClockService = {
       state.targetEpoch = null;
     }
     state.status = "paused";
-    state.awaitingPhaseStart = false;
+    state.awaitingPhaseStart = false; // manual pause, not phase transition
     save(state);
   },
 
@@ -288,6 +289,7 @@ export const focusClockService = {
     if (state.mode === "stopwatch") return;
     const selectedTag = state.tags.find((t) => t.id === state.selectedTagId);
     
+    // Calculate actual elapsed seconds
     const totalMs = state.phase === "focus"
       ? (state.focusMins * 60 + (state.focusSecs || 0)) * 1000
       : state.breakMins * 60 * 1000;
@@ -314,6 +316,7 @@ export const focusClockService = {
 
     if (state.phase === "focus") {
       if (state.breakMins === 0) {
+        // No break! Check if more loops remain
         const isInfinite = state.loops === -1;
         if (isInfinite || state.currentLoop < state.loops) {
           state.currentLoop += 1;
@@ -329,6 +332,7 @@ export const focusClockService = {
           state.awaitingPhaseStart = false;
         }
       } else {
+        // Focus done → queue break but DON'T auto-start; let user press Play
         state.phase = "break";
         state.pausedRemainingMs = state.breakMins * 60 * 1000;
         state.targetEpoch = null;
@@ -336,13 +340,14 @@ export const focusClockService = {
         state.awaitingPhaseStart = true;
       }
     } else {
+      // Break done → check if more loops remain
       const isInfinite = state.loops === -1;
       if (isInfinite || state.currentLoop < state.loops) {
         state.currentLoop += 1;
         state.phase = "focus";
         state.pausedRemainingMs = (state.focusMins * 60 + (state.focusSecs || 0)) * 1000;
         state.targetEpoch = null;
-        state.status = "paused";
+        state.status = "paused"; // wait for user to press Play
         state.awaitingPhaseStart = true;
       } else {
         state.status = "complete";
@@ -379,11 +384,14 @@ export const focusClockService = {
       state.history.push(session);
     }
     
+    // Reset stopwatch state
     state.status = "idle";
     state.stopwatchElapsedMs = 0;
     state.stopwatchStartEpoch = null;
     save(state);
   },
+
+
 
   updateSettings(
     patch: Partial<
@@ -463,6 +471,7 @@ export const focusClockService = {
       state.loops = tag.loops !== undefined ? tag.loops : 2;
       state.mode = tag.mode !== undefined ? tag.mode : "pomodoro";
       
+      // Reset clock to loaded tag's configurations
       state.status = "idle";
       state.phase = "focus";
       state.currentLoop = 1;
@@ -474,6 +483,7 @@ export const focusClockService = {
     }
     save(state);
   },
+
 
   getHistory(): FocusSession[] {
     return load().history;
