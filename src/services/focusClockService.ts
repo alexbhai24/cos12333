@@ -1,6 +1,6 @@
 /**
  * focusClockService.ts
- * Offline-first state machine for Focus Clock.
+ * Offline-first state machine for Focus Clock with Firestore Cloud Persistence.
  * Uses deadline-based timing (targetEpoch) so the countdown stays
  * accurate across tab switches, browser throttling, and page refreshes.
  */
@@ -16,7 +16,6 @@ export interface FocusTag {
   loops?: number;
   mode?: "pomodoro" | "stopwatch";
 }
-
 
 export interface FocusSession {
   id: string;
@@ -53,7 +52,56 @@ export interface FocusClockState {
   awaitingPhaseStart: boolean; // true when paused between phases (not a manual pause)
 }
 
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
 let activeUserKey: string = 'guest';
+
+async function syncToFirestore(key: string, state: FocusClockState): Promise<void> {
+  if (!key || key === 'guest') return;
+  try {
+    const ref = doc(db, 'user_focus_clock', key);
+    await setDoc(ref, {
+      selectedTagId: state.selectedTagId,
+      accentColor: state.accentColor,
+      focusMins: state.focusMins,
+      focusSecs: state.focusSecs || 0,
+      breakMins: state.breakMins,
+      loops: state.loops,
+      mode: state.mode,
+      reminderEnabled: state.reminderEnabled,
+      clockBrightness: state.clockBrightness,
+      tags: state.tags,
+      history: state.history,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[focusClockService] Firestore sync error:', err);
+  }
+}
+
+async function loadFromFirestore(key: string): Promise<void> {
+  if (!key || key === 'guest') return;
+  try {
+    const ref = doc(db, 'user_focus_clock', key);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const remote = snap.data() as Partial<FocusClockState>;
+      const local = load();
+      const mergedTags = remote.tags && remote.tags.length > 0 ? remote.tags : local.tags;
+      const newState: FocusClockState = {
+        ...local,
+        ...remote,
+        tags: mergedTags,
+        history: remote.history || local.history,
+      };
+      localStorage.setItem(getStorageKey(), JSON.stringify(newState));
+      listeners.forEach((cb) => cb());
+    }
+  } catch (err) {
+    console.warn('[focusClockService] Firestore load error:', err);
+  }
+}
 
 const DEFAULT_NEW_ACCOUNT_TAGS: FocusTag[] = [
   {
@@ -118,6 +166,9 @@ function load(): FocusClockState {
 function save(state: FocusClockState): void {
   localStorage.setItem(getStorageKey(), JSON.stringify(state));
   listeners.forEach((cb) => cb());
+  if (activeUserKey && activeUserKey !== 'guest') {
+    syncToFirestore(activeUserKey, state);
+  }
 }
 
 function getRemainingMs(state: FocusClockState): number {
@@ -147,6 +198,9 @@ export const focusClockService = {
     if (activeUserKey !== nextKey) {
       activeUserKey = nextKey;
       listeners.forEach((cb) => cb());
+    }
+    if (nextKey !== 'guest') {
+      loadFromFirestore(nextKey);
     }
   },
 
@@ -212,7 +266,7 @@ export const focusClockService = {
       state.targetEpoch = null;
     }
     state.status = "paused";
-    state.awaitingPhaseStart = false; // manual pause, not phase transition
+    state.awaitingPhaseStart = false;
     save(state);
   },
 
@@ -234,7 +288,6 @@ export const focusClockService = {
     if (state.mode === "stopwatch") return;
     const selectedTag = state.tags.find((t) => t.id === state.selectedTagId);
     
-    // Calculate actual elapsed seconds
     const totalMs = state.phase === "focus"
       ? (state.focusMins * 60 + (state.focusSecs || 0)) * 1000
       : state.breakMins * 60 * 1000;
@@ -261,7 +314,6 @@ export const focusClockService = {
 
     if (state.phase === "focus") {
       if (state.breakMins === 0) {
-        // No break! Check if more loops remain
         const isInfinite = state.loops === -1;
         if (isInfinite || state.currentLoop < state.loops) {
           state.currentLoop += 1;
@@ -277,7 +329,6 @@ export const focusClockService = {
           state.awaitingPhaseStart = false;
         }
       } else {
-        // Focus done → queue break but DON'T auto-start; let user press Play
         state.phase = "break";
         state.pausedRemainingMs = state.breakMins * 60 * 1000;
         state.targetEpoch = null;
@@ -285,14 +336,13 @@ export const focusClockService = {
         state.awaitingPhaseStart = true;
       }
     } else {
-      // Break done → check if more loops remain
       const isInfinite = state.loops === -1;
       if (isInfinite || state.currentLoop < state.loops) {
         state.currentLoop += 1;
         state.phase = "focus";
         state.pausedRemainingMs = (state.focusMins * 60 + (state.focusSecs || 0)) * 1000;
         state.targetEpoch = null;
-        state.status = "paused"; // wait for user to press Play
+        state.status = "paused";
         state.awaitingPhaseStart = true;
       } else {
         state.status = "complete";
@@ -329,14 +379,11 @@ export const focusClockService = {
       state.history.push(session);
     }
     
-    // Reset stopwatch state
     state.status = "idle";
     state.stopwatchElapsedMs = 0;
     state.stopwatchStartEpoch = null;
     save(state);
   },
-
-
 
   updateSettings(
     patch: Partial<
@@ -416,7 +463,6 @@ export const focusClockService = {
       state.loops = tag.loops !== undefined ? tag.loops : 2;
       state.mode = tag.mode !== undefined ? tag.mode : "pomodoro";
       
-      // Reset clock to loaded tag's configurations
       state.status = "idle";
       state.phase = "focus";
       state.currentLoop = 1;
@@ -428,7 +474,6 @@ export const focusClockService = {
     }
     save(state);
   },
-
 
   getHistory(): FocusSession[] {
     return load().history;
