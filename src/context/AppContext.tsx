@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type {
   Theme,
   BackgroundType,
@@ -19,6 +19,7 @@ import { normalizeGrade } from '../utils/gradeUtils';
 import { auth } from '../firebase';
 import { updateProfile as updateAuthProfile } from 'firebase/auth';
 import { updateProfile as updateFirestoreProfile } from '../services/userProfileService';
+import { focusClockService } from '../services/focusClockService';
 
 interface AppContextType {
   currentRoute: PageRoute;
@@ -157,6 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Subscribe to Firestore posts in real-time
   useEffect(() => {
     const unsubscribe = postService.subscribe((firestorePosts) => {
+      // Mark which posts the current user has liked
       const uid = currentUser?.uid;
       const enriched = firestorePosts.map(p => ({
         ...p,
@@ -167,6 +169,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return unsubscribe;
   }, [currentUser]);
 
+  // Sync Focus Clock immediately
+  useEffect(() => {
+    focusClockService.setUserKey(currentUser?.uid || currentUser?.email || 'guest');
+  }, [currentUser]);
+
   // Sync Firebase Auth user + Firestore userProfile into local UserProfile state
   useEffect(() => {
     if (currentUser) {
@@ -174,7 +181,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const isFixedAdmin = email === 'rajanandalex1@gmail.com';
       const isAdmin = isFixedAdmin || userRole === 'admin';
       const userType = isAdmin ? 'teacher' : (userRole === 'teacher' ? 'teacher' : 'student');
-      
+
       const currentProfile = profileService.getProfile();
       const fp = userProfile;
 
@@ -222,7 +229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (history.length > 0) {
         const sortedHistory = [...history].sort();
         const lastDateStr = sortedHistory[sortedHistory.length - 1];
-        
+
         const lastDate = new Date(lastDateStr);
         const todayDate = new Date(todayStr);
         const diffTime = todayDate.getTime() - lastDate.getTime();
@@ -230,12 +237,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (diffDays > 1) {
           const missedDays = diffDays - 1;
-          
+
           if (newFreezes >= missedDays) {
             newFreezes -= missedDays;
             newStreak += 1;
             streakSavedByFreeze = true;
-            
+
             for (let i = 1; i <= missedDays; i++) {
               const d = new Date(lastDate);
               d.setDate(d.getDate() + i);
@@ -285,15 +292,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedGradeState(normalizeGrade(newProfile.gradeLevel));
     }
 
+    // Sync to Firebase Auth and Firestore
     if (auth.currentUser) {
       const targetName = updated.name || `${updated.firstName || ''} ${updated.lastName || ''}`.trim();
       const targetPhoto = updated.photoUrl || '';
-      const targetRole = (updated.isAdmin || updated.role?.toLowerCase().includes('admin')) 
-        ? 'admin' 
-        : (updated.role?.toLowerCase() === 'teacher' || updated.userType === 'teacher') 
-          ? 'teacher' 
+      const targetRole = (updated.isAdmin || updated.role?.toLowerCase().includes('admin'))
+        ? 'admin'
+        : (updated.role?.toLowerCase() === 'teacher' || updated.userType === 'teacher')
+          ? 'teacher'
           : 'student';
-      
+
       updateAuthProfile(auth.currentUser, {
         displayName: targetName,
         photoURL: targetPhoto,
@@ -373,8 +381,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPost = (title: string, content: string, category: Post['category'], tags: string[], mediaUrl?: string) => {
+    // If running without Firebase Auth, fallback to local user profile for authorId
     const authorId = currentUser?.uid || user?.email || `local-user-${Date.now()}`;
-    
+
     const newPostObj: any = {
       authorId,
       title,
@@ -389,6 +398,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newPostObj.mediaUrl = mediaUrl;
     }
 
+    // Optimistic UI Update
     const optimisticPost: Post = {
       ...newPostObj,
       id: `local-${Date.now()}`,
@@ -413,6 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deletePost = (postId: string) => {
+    // Optimistic UI update
     setPosts(prev => prev.filter(p => p.id !== postId));
     postService.deletePost(postId).then(() => {
       showNotification('Post deleted 🗑️');
