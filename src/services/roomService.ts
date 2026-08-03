@@ -1,17 +1,16 @@
 import {
-  ref,
-  push,
-  set,
-  onValue,
-  off,
+  collection,
+  doc,
+  addDoc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
   serverTimestamp,
   query,
-  orderByChild,
-  limitToLast,
-  onDisconnect,
-  update,
-} from 'firebase/database';
-import { rtdb } from '../firebase';
+  orderBy,
+  limit,
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import type { StudyRoom, RoomMessage, UserProfile } from '../types';
 import { normalizeGrade, normalizeDesignation } from '../utils/gradeUtils';
 
@@ -121,13 +120,7 @@ export const ALL_STUDY_ROOMS: StudyRoom[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RTDB PATH HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-const messagesPath = (roomId: string) => `rooms/${roomId}/messages`;
-const presencePath = (roomId: string, uid: string) => `rooms/${roomId}/presence/${uid}`;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROOM SERVICE
+// ROOM SERVICE (Firestore Migration)
 // ─────────────────────────────────────────────────────────────────────────────
 export const roomService = {
   getAllRooms: (): StudyRoom[] => ALL_STUDY_ROOMS,
@@ -156,57 +149,59 @@ export const roomService = {
     return room.id === (map[grade] ?? '');
   },
 
-  // ── REALTIME DATABASE: Subscribe to last 100 messages ──────────────────────
+  // ── FIRESTORE: Subscribe to last 100 messages ──────────────────────────────
   subscribeMessages: (
     roomId: string,
     callback: (messages: RoomMessage[]) => void
   ): (() => void) => {
-    const msgRef = query(
-      ref(rtdb, messagesPath(roomId)),
-      orderByChild('sentAt'),
-      limitToLast(100)
+    const q = query(
+      collection(db, 'study_rooms', roomId, 'messages'),
+      orderBy('sentAt', 'desc'),
+      limit(100)
     );
 
-    const handler = onValue(
-      msgRef,
-      (snap) => {
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
         const msgs: RoomMessage[] = [];
-        snap.forEach((child) => {
-          const d = child.val();
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          let timeStr = 'Just now';
+          if (d.sentAt) {
+            const date = d.sentAt.toDate ? d.sentAt.toDate() : new Date(d.sentAt);
+            timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
           msgs.push({
-            id: child.key!,
+            id: docSnap.id,
             roomId,
             authorName: d.authorName ?? 'Anonymous',
             authorAvatar: d.authorAvatar ?? 'gradient:astronaut',
             authorRole: d.authorRole ?? 'Student',
             authorBadge: d.authorBadge ?? 'Student 🎒',
             text: d.text ?? '',
-            timestamp: d.timestamp ?? new Date(d.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: d.timestamp ?? timeStr,
             attachments: d.attachments ?? undefined,
           });
         });
-        callback(msgs);
+        // We ordered by desc so we have newest first. Reverse to display newest at bottom.
+        callback(msgs.reverse());
       },
       (error) => {
-        console.warn('[roomService] RTDB subscribeMessages error:', error);
+        console.warn('[roomService] Firestore subscribeMessages error:', error);
         callback(roomService.getRoomMessages(roomId));
       }
     );
 
-    // Return unsubscribe function
-    return () => off(msgRef, 'value', handler);
+    return unsubscribe;
   },
 
-  // ── REALTIME DATABASE: Send a message ──────────────────────────────────────
+  // ── FIRESTORE: Send a message ──────────────────────────────────────────────
   sendMessage: (
     roomId: string,
     msgText: string,
     userObj: UserProfile,
     attachments?: { name: string; url: string }[]
   ): RoomMessage => {
-    const msgRef = ref(rtdb, messagesPath(roomId));
-    const newRef = push(msgRef);
-
     const now = new Date();
     const payload = {
       roomId,
@@ -224,20 +219,13 @@ export const roomService = {
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
     };
 
-    set(newRef, payload).catch((err) =>
-      console.error('[roomService] Failed to send message to RTDB:', err)
-    );
+    const newDocId = `local-${Date.now()}`;
+    addDoc(collection(db, 'study_rooms', roomId, 'messages'), payload)
+      .catch((err) => console.error('[roomService] Failed to send message to Firestore:', err));
 
     const optimisticMessage: RoomMessage = {
-      id: newRef.key || `local-${Date.now()}`,
-      roomId,
-      authorName: payload.authorName,
-      authorAvatar: payload.authorAvatar,
-      authorRole: payload.authorRole,
-      authorBadge: payload.authorBadge,
-      text: payload.text,
-      timestamp: payload.timestamp,
-      attachments,
+      id: newDocId,
+      ...payload,
     };
 
     // Save to localStorage fallback
@@ -256,10 +244,10 @@ export const roomService = {
   },
 
   deleteRoomMessage: (roomId: string, messageId: string): void => {
-    // Delete from Firebase RTDB
+    // Delete from Firebase Firestore
     if (!messageId.startsWith('local-')) {
-      const msgRef = ref(rtdb, `${messagesPath(roomId)}/${messageId}`);
-      set(msgRef, null).catch(err => console.error('[roomService] Failed to delete RTDB msg:', err));
+      deleteDoc(doc(db, 'study_rooms', roomId, 'messages', messageId))
+        .catch(err => console.error('[roomService] Failed to delete Firestore msg:', err));
     }
 
     // Delete from localStorage fallback
@@ -278,18 +266,15 @@ export const roomService = {
     }
   },
 
-  // ── REALTIME DATABASE: Track user presence in a room ───────────────────────
+  // ── FIRESTORE: Track user presence in a room ───────────────────────────────
   joinRoom: (roomId: string, uid: string, userObj: UserProfile): void => {
     try {
-      const presRef = ref(rtdb, presencePath(roomId, uid));
-      const data = {
+      setDoc(doc(db, 'study_rooms', roomId, 'presence', uid), {
         name: userObj.name || 'Anonymous',
         avatar: userObj.photoUrl || 'gradient:astronaut',
         joinedAt: serverTimestamp(),
         online: true,
-      };
-      set(presRef, data).catch((err) => console.warn('[roomService] joinRoom set failed:', err));
-      onDisconnect(presRef).remove().catch((err) => console.warn('[roomService] onDisconnect failed:', err));
+      }, { merge: true }).catch(e => console.warn('joinRoom fail:', e));
     } catch (e) {
       console.warn('[roomService] joinRoom error:', e);
     }
@@ -297,37 +282,34 @@ export const roomService = {
 
   leaveRoom: (roomId: string, uid: string): void => {
     try {
-      const presRef = ref(rtdb, presencePath(roomId, uid));
-      set(presRef, null).catch((err) => console.warn('[roomService] leaveRoom failed:', err));
+      deleteDoc(doc(db, 'study_rooms', roomId, 'presence', uid))
+        .catch(e => console.warn('leaveRoom fail:', e));
     } catch (e) {
       console.warn('[roomService] leaveRoom error:', e);
     }
   },
 
-  // ── REALTIME DATABASE: Subscribe to live online count ──────────────────────
+  // ── FIRESTORE: Subscribe to live online count ──────────────────────────────
   subscribeOnlineCount: (
     roomId: string,
     callback: (count: number) => void
   ): (() => void) => {
-    const presRef = ref(rtdb, `rooms/${roomId}/presence`);
-    const handler = onValue(
-      presRef,
-      (snap) => {
-        callback(snap.size ?? 0);
-      },
-      (error) => {
-        console.warn('[roomService] RTDB subscribeOnlineCount error:', error);
-      }
-    );
-    return () => off(presRef, 'value', handler);
+    const q = collection(db, 'study_rooms', roomId, 'presence');
+    const unsubscribe = onSnapshot(q, (snap) => {
+      callback(snap.size ?? 0);
+    }, (error) => {
+      console.warn('[roomService] Firestore subscribeOnlineCount error:', error);
+    });
+    return unsubscribe;
   },
 
   updateRoomTopic: (roomId: string, topic: string): void => {
     const room = ALL_STUDY_ROOMS.find((r) => r.id === roomId);
     if (room) room.topic = topic;
 
-    // Also persist topic to RTDB
-    update(ref(rtdb, `rooms/${roomId}`), { topic }).catch(console.error);
+    // Persist topic to Firestore
+    setDoc(doc(db, 'study_rooms', roomId), { topic }, { merge: true })
+      .catch(console.error);
   },
 
   // Legacy sync fallback: read messages from localStorage (offline mode)
