@@ -73,7 +73,7 @@ interface AppContextType {
   publicProfileUser: Partial<UserProfile> | null;
   setPublicProfileUser: (user: Partial<UserProfile> | null) => void;
   openPublicProfile: (userObj: Partial<UserProfile>) => void;
-  completeTest: (testId: string) => void;
+  completeTest: (testId: string, appleReward?: number) => void;
   claimDailyStreak: () => void;
   notificationMessage: string | null;
   showNotification: (msg: string) => void;
@@ -96,7 +96,29 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRoute, setCurrentRoute] = useState<PageRoute>('home');
+  const [currentRoute, setCurrentRouteState] = useState<PageRoute>(() => {
+    const hash = window.location.hash.replace('#', '') as PageRoute;
+    if (hash) return hash;
+    return (localStorage.getItem('cosmicbone_current_route') as PageRoute) || 'home';
+  });
+
+  const setCurrentRoute = (route: PageRoute) => {
+    setCurrentRouteState(route);
+    localStorage.setItem('cosmicbone_current_route', route);
+    window.location.hash = route;
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as PageRoute;
+      if (hash && hash !== currentRoute) {
+        setCurrentRouteState(hash);
+        localStorage.setItem('cosmicbone_current_route', hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [currentRoute]);
 
   const [theme, setThemeState] = useState<Theme>(() => {
     return (localStorage.getItem('cosmicbone_theme') as Theme) || 'dark-black';
@@ -212,66 +234,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentUser, userRole, userProfile]);
 
+  const getLocalDayString = (d: Date = new Date()): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const getDayDifference = (dateStrA: string, dateStrB: string): number => {
+    try {
+      const [y1, m1, d1] = dateStrA.split('-').map(Number);
+      const [y2, m2, d2] = dateStrB.split('-').map(Number);
+      const utc1 = Date.UTC(y1, m1 - 1, d1);
+      const utc2 = Date.UTC(y2, m2 - 1, d2);
+      return Math.round((utc2 - utc1) / (1000 * 60 * 60 * 24));
+    } catch {
+      return 0;
+    }
+  };
+
   const claimDailyStreak = () => {
     if (!user || !user.email) return;
-    const todayStr = new Date().toLocaleDateString('en-CA');
+    const todayStr = getLocalDayString();
     const history = user.streakHistory || [];
 
     if (!history.includes(todayStr)) {
-      let newStreak = user.streak || 0;
-      let newFreezes = user.streakFreezes || 0;
+      let currentStreak = user.streak || 0;
+      let availableFreezes = user.streakFreezes || 0;
       const frozen = user.frozenDates || [];
       let newFrozen = [...frozen];
       let newHistory = [...history, todayStr];
       let streakSavedByFreeze = false;
       let streakBroken = false;
+      let newStreak = currentStreak;
 
       if (history.length > 0) {
         const sortedHistory = [...history].sort();
         const lastDateStr = sortedHistory[sortedHistory.length - 1];
+        const diffDays = getDayDifference(lastDateStr, todayStr);
 
-        const lastDate = new Date(lastDateStr);
-        const todayDate = new Date(todayStr);
-        const diffTime = todayDate.getTime() - lastDate.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays > 1) {
+        if (diffDays === 1) {
+          // Consecutive calendar day -> advance streak!
+          newStreak = currentStreak + 1;
+        } else if (diffDays > 1) {
           const missedDays = diffDays - 1;
 
-          if (newFreezes >= missedDays) {
-            newFreezes -= missedDays;
-            newStreak += 1;
+          if (availableFreezes >= missedDays) {
+            // Duolingo Freeze Protection: Automatically shield streak using equipped freezes
+            availableFreezes -= missedDays;
+            newStreak = currentStreak + 1;
             streakSavedByFreeze = true;
 
             for (let i = 1; i <= missedDays; i++) {
-              const d = new Date(lastDate);
-              d.setDate(d.getDate() + i);
-              const frozenStr = d.toLocaleDateString('en-CA');
+              const [y, m, d] = lastDateStr.split('-').map(Number);
+              const missedDate = new Date(y, m - 1, d + i);
+              const frozenStr = getLocalDayString(missedDate);
               if (!newFrozen.includes(frozenStr)) {
                 newFrozen.push(frozenStr);
               }
             }
-            showNotification(`${missedDays} Streak Freeze(s) applied to save your streak! ❄️`);
+            showNotification(`❄️ Streak Freeze equipped! Protected your ${newStreak}-day streak!`);
           } else {
+            // Broken streak
             newStreak = 1;
             newHistory = [todayStr];
             streakBroken = true;
-            showNotification('Streak broken! Not enough freezes. Starting anew. 🎒');
+            showNotification('Streak started anew for today! Keep learning daily 🔥');
           }
-        } else if (diffDays === 1) {
-          newStreak += 1;
+        } else {
+          newStreak = Math.max(currentStreak, 1);
         }
       } else {
         newStreak = 1;
       }
 
       if (!streakBroken && !streakSavedByFreeze) {
-        showNotification(`Daily Check-in! Streak is now ${newStreak} Days 🔥`);
+        showNotification(`🔥 Streak Active! You reached ${newStreak} Days!`);
       }
 
       updateUserProfile({
         streak: newStreak,
-        streakFreezes: newFreezes,
+        streakFreezes: availableFreezes,
         frozenDates: newFrozen,
         streakHistory: newHistory,
       });
@@ -520,12 +563,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const completeTest = (_testId: string) => {
+  const completeTest = (testId: string, appleReward?: number) => {
     claimDailyStreak();
+
+    // Get current completed test IDs from user state and localStorage cache
+    let storedCompleted: string[] = [];
+    try {
+      const raw = localStorage.getItem('cosmicbone_completed_tests');
+      if (raw) storedCompleted = JSON.parse(raw);
+    } catch (e) {}
+
+    const alreadyCompleted =
+      Boolean(testId && user.completedTestIds && user.completedTestIds.includes(testId)) ||
+      Boolean(testId && storedCompleted.includes(testId));
+
+    if (alreadyCompleted) {
+      showNotification('Test submitted! (One-time 🍏 Apple reward already claimed previously)');
+      return;
+    }
+
+    const rewardAmount = typeof appleReward === 'number' && appleReward > 0 ? appleReward : 25;
+    const updatedCompleted = testId
+      ? Array.from(new Set([...(user.completedTestIds || []), ...storedCompleted, testId]))
+      : (user.completedTestIds || []);
+
+    try {
+      localStorage.setItem('cosmicbone_completed_tests', JSON.stringify(updatedCompleted));
+    } catch (e) {}
+
     updateUserProfile({
-      apples: (user.apples || 0) + 50,
+      apples: (user.apples || 0) + rewardAmount,
+      completedTestIds: updatedCompleted,
     });
-    showNotification('Test completed! +50 Green Apples earned 🍏');
+
+    showNotification(`🎉 Test completed! Alloted +${rewardAmount} Green Apples 🍏 (One-time Reward)`);
   };
 
   const changeUserRole = (email: string, newRole: string) => {
