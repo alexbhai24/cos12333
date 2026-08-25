@@ -182,7 +182,7 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
       timestamp: Date.now(),
       image: attachment?.type === 'image' ? attachment.base64 : undefined,
       filename: attachment?.file.name
-    };
+    } as any;
     onAddMessage(userMsg);
     
     const currentText = textToSend;
@@ -210,7 +210,7 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
     onAddMessage(botMsg);
 
     try {
-      const response = await aiService.sendMessage({
+      const payload: any = {
         message: currentText,
         mode: currentMode,
         attachment: currentAttachment,
@@ -220,7 +220,8 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
           currentRoute,
           permittedContent: []
         }
-      });
+      };
+      const response = await aiService.sendMessage(payload);
       if (response.error) {
         onUpdateMessage(botMsgId, { content: response.error });
       } else {
@@ -561,10 +562,10 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
                         <img src={msg.image} alt="Upload" className="max-h-40 w-auto object-contain" />
                       </div>
                     )}
-                    {msg.filename && (
+                    {(msg as any).filename && (
                       <div className="flex items-center space-x-1.5 text-xs text-[#00F0FF] mb-1 font-mono">
                         <FileText className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[180px]">{msg.filename}</span>
+                        <span className="truncate max-w-[180px]">{(msg as any).filename}</span>
                       </div>
                     )}
                     <p className="text-xs text-gray-100 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
