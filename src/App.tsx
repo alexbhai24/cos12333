@@ -121,14 +121,19 @@ const AppContent: React.FC = () => {
     isStreakDrawerOpen, isAppleShopOpen, isQrModalOpen,
   ]);
 
-  // 1. Firebase is resolving auth state — show spinner
+  // 1. Firebase is resolving auth state — show the real app shell to make it feel instantly loaded
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#040812]">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="w-10 h-10 text-[#00F0FF] animate-spin" />
-          <span className="text-sm text-gray-500 tracking-widest uppercase">Loading…</span>
-        </div>
+      <div className="min-h-screen relative font-sans text-white select-none overflow-x-hidden">
+        <BackgroundCanvas />
+        <TopBar />
+        <Sidebar />
+        <main className={`relative z-10 pt-20 pb-12 px-4 sm:px-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
+          <div className="max-w-[1366px] mx-auto">
+            {/* Empty space during split-second loading */}
+            <div className="h-64" />
+          </div>
+        </main>
       </div>
     );
   }
