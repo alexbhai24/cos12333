@@ -1,8 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Volume2, Square, X, ChevronDown, RefreshCw } from 'lucide-react';
+import { 
+  Send, 
+  Plus, 
+  Volume2, 
+  Square, 
+  X, 
+  ChevronDown, 
+  RefreshCw, 
+  Copy, 
+  Check, 
+  FileText, 
+  Mic, 
+  MicOff, 
+  ThumbsUp, 
+  ThumbsDown,
+  Sparkles,
+  Search,
+  BookOpen,
+  Brain
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ChatMessage } from '../../services/chatHistoryStore';
 import { aiService } from '../../services/aiService';
+import { MermaidViewer } from './MermaidViewer';
 
 interface BoneAIChatProps {
   messages: ChatMessage[];
@@ -11,17 +31,27 @@ interface BoneAIChatProps {
   currentRoute: string;
 }
 
-const MODES = ['Smart', 'Think Deeper', 'Study & Learn', 'Google Search'];
+const MODES = [
+  { name: 'Smart', desc: 'Fast, direct answers', icon: Sparkles },
+  { name: 'Think Deeper', desc: 'Deep step-by-step reasoning', icon: Brain },
+  { name: 'Study & Learn', desc: 'Personal private tutor', icon: BookOpen },
+  { name: 'Google Search', desc: 'Real-time web information', icon: Search },
+];
 
 export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, onUpdateMessage, currentRoute }) => {
   const [inputText, setInputText] = useState('');
   const [mode, setMode] = useState('Smart');
   const [isModeOpen, setIsModeOpen] = useState(false);
-  const [image, setImage] = useState<{ file: File; base64: string } | null>(null);
+  const [attachment, setAttachment] = useState<{ file: File; base64: string; type: 'image' | 'pdf' } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({});
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Scroll to bottom
   useEffect(() => {
@@ -56,28 +86,84 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
   useEffect(() => {
     return () => {
       if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (recognitionRef.current) recognitionRef.current.stop();
     };
   }, []);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const toggleVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0].transcript)
+          .join('');
+        setInputText(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('Speech recognition failed to start:', err);
+      setIsListening(false);
+    }
+  };
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Maximum image size is 10 MB');
+      alert('Maximum file size is 10 MB');
       return;
     }
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      alert('Only JPG, PNG, and WebP formats are supported');
+    const isPdf = file.type === 'application/pdf';
+    const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+
+    if (!isImage && !isPdf) {
+      alert('Only JPG, PNG, WebP, and PDF formats are supported');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
-        setImage({ file, base64: event.target.result as string });
+        setAttachment({ file, base64: event.target.result as string, type: isPdf ? 'pdf' : 'image' });
       }
     };
     reader.readAsDataURL(file);
@@ -86,7 +172,7 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
 
   const handleSend = async (customText?: string) => {
     const textToSend = customText !== undefined ? customText : inputText.trim();
-    if ((!textToSend && !image) || isGenerating) return;
+    if ((!textToSend && !attachment) || isGenerating) return;
 
     const userMsgId = Date.now().toString();
     const userMsg: ChatMessage = {
@@ -94,16 +180,23 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
       role: 'user',
       content: textToSend,
       timestamp: Date.now(),
-      image: image?.base64
+      image: attachment?.type === 'image' ? attachment.base64 : undefined,
+      filename: attachment?.file.name
     };
     onAddMessage(userMsg);
     
     const currentText = textToSend;
     const currentMode = mode;
-    const currentImage = image ? { data: image.base64, mimeType: image.file.type } : undefined;
+    const currentAttachment = attachment ? { data: attachment.base64, mimeType: attachment.file.type, filename: attachment.file.name } : undefined;
     
+    // Pass previous turns for conversation memory
+    const historyPayload = messages
+      .filter(m => m.content && m.content !== '...')
+      .slice(-8)
+      .map(m => ({ role: m.role, content: m.content }));
+
     setInputText('');
-    setImage(null);
+    setAttachment(null);
     setIsGenerating(true);
 
     const botMsgId = (Date.now() + 1).toString();
@@ -120,11 +213,14 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
       const response = await aiService.sendMessage({
         message: currentText,
         mode: currentMode,
-        image: currentImage,
-        conversationId: botMsgId,
-        assistantContext: { currentRoute }
+        attachment: currentAttachment,
+        history: historyPayload,
+        conversationId: 'default',
+        assistantContext: {
+          currentRoute,
+          permittedContent: []
+        }
       });
-
       if (response.error) {
         onUpdateMessage(botMsgId, { content: response.error });
       } else {
@@ -141,10 +237,11 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
   };
 
   // Safe Text Formatter (Sanitized inline renderer, prevents custom/raw HTML injection)
+  // Safe Text Formatter (Enhanced with Mermaid, Visual Images, Tables, and Math)
   const renderFormattedText = (text: string) => {
     if (text === '...') {
       return (
-        <div className="flex space-x-1.5 items-center h-5">
+        <div className="flex space-x-1.5 items-center h-6 py-2">
           <div className="w-2 h-2 bg-[#00F0FF] rounded-full animate-bounce"></div>
           <div className="w-2 h-2 bg-[#00F0FF] rounded-full animate-bounce [animation-delay:0.2s]"></div>
           <div className="w-2 h-2 bg-[#00F0FF] rounded-full animate-bounce [animation-delay:0.4s]"></div>
@@ -152,13 +249,12 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
       );
     }
 
-    // Escape basic HTML elements to prevent raw scripting/iframe loads
-    const escaped = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    // Split text by fenced code blocks (```mermaid or ```lang)
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+    const segments: React.ReactNode[] = [];
+    let lastIdx = 0;
+    let blockMatch: RegExpExecArray | null;
 
-    // Helper for chemical/math formulas inside $ ... $
     const parseMathToJSX = (mathText: string): React.ReactNode => {
       let clean = mathText.replace(/\\text\{([^}]+)\}/g, '$1');
       const tokens: React.ReactNode[] = [];
@@ -167,320 +263,542 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
         if (clean[i] === '_') {
           i++;
           if (clean[i] === '{') {
-            const end = clean.indexOf('}', i);
-            if (end !== -1) {
-              tokens.push(<sub key={i} className="text-xs font-sans font-bold select-text">{clean.substring(i + 1, end)}</sub>);
-              i = end + 1;
-            } else {
-              tokens.push(<sub key={i} className="text-xs font-sans font-bold select-text">{clean.substring(i)}</sub>);
-              break;
+            const close = clean.indexOf('}', i);
+            if (close !== -1) {
+              tokens.push(<sub key={i} className="text-[11px] text-[#00F0FF] font-mono">{clean.slice(i + 1, close)}</sub>);
+              i = close + 1;
+              continue;
             }
-          } else {
-            tokens.push(<sub key={i} className="text-xs font-sans font-bold select-text">{clean[i]}</sub>);
+          } else if (clean[i]) {
+            tokens.push(<sub key={i} className="text-[11px] text-[#00F0FF] font-mono">{clean[i]}</sub>);
             i++;
+            continue;
           }
         } else if (clean[i] === '^') {
           i++;
           if (clean[i] === '{') {
-            const end = clean.indexOf('}', i);
-            if (end !== -1) {
-              tokens.push(<sup key={i} className="text-xs font-sans font-bold select-text">{clean.substring(i + 1, end)}</sup>);
-              i = end + 1;
-            } else {
-              tokens.push(<sup key={i} className="text-xs font-sans font-bold select-text">{clean.substring(i)}</sup>);
-              break;
+            const close = clean.indexOf('}', i);
+            if (close !== -1) {
+              tokens.push(<sup key={i} className="text-[11px] text-[#00F0FF] font-mono">{clean.slice(i + 1, close)}</sup>);
+              i = close + 1;
+              continue;
             }
-          } else {
-            tokens.push(<sup key={i} className="text-xs font-sans font-bold select-text">{clean[i]}</sup>);
+          } else if (clean[i]) {
+            tokens.push(<sup key={i} className="text-[11px] text-[#00F0FF] font-mono">{clean[i]}</sup>);
             i++;
+            continue;
           }
-        } else {
-          tokens.push(clean[i]);
-          i++;
         }
+        tokens.push(clean[i]);
+        i++;
       }
-      return <>{tokens}</>;
+      return tokens;
     };
 
-    // Helper for inline formatting (bold, math)
-    const parseInlineFormatting = (lineText: string): React.ReactNode[] => {
-      const mathSegments = lineText.split('$');
-      return mathSegments.map((segText, sIdx) => {
-        if (sIdx % 2 === 1) {
-          return (
-            <span key={sIdx} className="font-mono text-[#00F0FF] bg-white/5 px-1 py-0.5 rounded select-text">
-              {parseMathToJSX(segText)}
+    const parseInlineFormatting = (line: string): React.ReactNode => {
+      const parts: React.ReactNode[] = [];
+      const regex = /(\$\$[\s\S]*?\$\$|\$[^\$]+?\$|\*\*[^*]+?\*\*|\*[^*]+?\*|`[^`]+?`|!\[([^\]]*?)\]\((https?:\/\/[^\s\)]+)\))/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(line)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(line.substring(lastIndex, match.index));
+        }
+
+        const token = match[0];
+        
+        // Markdown Image Embed ![alt](url)
+        if (token.startsWith('![') && match[2] && match[3]) {
+          const altText = match[2];
+          const imgUrl = match[3];
+          parts.push(
+            <div key={match.index} className="my-3 rounded-2xl overflow-hidden border border-white/10 bg-[#070d18] shadow-2xl group">
+              <div className="relative">
+                <img 
+                  src={imgUrl} 
+                  alt={altText} 
+                  className="w-full max-h-80 object-contain bg-black/60 rounded-t-2xl" 
+                  loading="lazy" 
+                />
+                <div className="p-2.5 bg-[#091120] border-t border-white/5 flex items-center justify-between">
+                  <span className="text-[#00F0FF] font-semibold text-xs truncate max-w-[240px] flex items-center space-x-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF]"></span>
+                    <span>{altText || 'Generated Visual Illustration'}</span>
+                  </span>
+                  <a 
+                    href={imgUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-[10px] text-gray-300 hover:text-white px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center space-x-1 font-medium"
+                  >
+                    <span>View HD</span>
+                    <span>↗</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          );
+        } else if (token.startsWith('$$') && token.endsWith('$$')) {
+          const math = token.slice(2, -2);
+          parts.push(
+            <span key={match.index} className="font-mono text-[#00F0FF] bg-[#00F0FF]/10 px-1.5 py-0.5 rounded text-xs font-semibold">
+              {parseMathToJSX(math)}
             </span>
           );
+        } else if (token.startsWith('$') && token.endsWith('$')) {
+          const math = token.slice(1, -1);
+          parts.push(
+            <span key={match.index} className="font-mono text-[#00F0FF] bg-[#00F0FF]/10 px-1.5 py-0.5 rounded text-xs font-semibold">
+              {parseMathToJSX(math)}
+            </span>
+          );
+        } else if (token.startsWith('**') && token.endsWith('**')) {
+          parts.push(
+            <strong key={match.index} className="font-semibold text-white">
+              {token.slice(2, -2)}
+            </strong>
+          );
+        } else if (token.startsWith('*') && token.endsWith('*')) {
+          parts.push(
+            <em key={match.index} className="italic text-gray-200">
+              {token.slice(1, -1)}
+            </em>
+          );
+        } else if (token.startsWith('`') && token.endsWith('`')) {
+          parts.push(
+            <code key={match.index} className="font-mono text-xs text-[#00F0FF] bg-black/40 px-1.5 py-0.5 rounded border border-white/10">
+              {token.slice(1, -1)}
+            </code>
+          );
         }
-        
-        const boldSegments = segText.split('**');
-        return boldSegments.map((bSeg, bIdx) => {
-          if (bIdx % 2 === 1) {
-            return <strong key={`${sIdx}-${bIdx}`} className="text-white font-bold select-text">{bSeg}</strong>;
+        lastIndex = regex.lastIndex;
+      }
+
+      if (lastIndex < line.length) {
+        parts.push(line.substring(lastIndex));
+      }
+
+      return parts;
+    };
+
+    const renderTextSegment = (textChunk: string, keyPrefix: string) => {
+      const paragraphs = textChunk.split(/\n\s*\n/);
+
+      return paragraphs.map((para, pIdx) => {
+        const lines = para.split('\n');
+
+        // Check if paragraph is a markdown table
+        if (lines.length >= 2 && lines[0].includes('|') && lines[1].includes('|')) {
+          const headerCells = lines[0].split('|').filter(c => c.trim() !== '');
+          const rows = lines.slice(2).map(r => r.split('|').filter(c => c.trim() !== ''));
+
+          return (
+            <div key={`${keyPrefix}_tbl_${pIdx}`} className="my-2.5 overflow-x-auto rounded-xl border border-white/10">
+              <table className="w-full text-left text-xs border-collapse bg-[#0c1424]">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/5 text-[#00F0FF]">
+                    {headerCells.map((h, hIdx) => (
+                      <th key={hIdx} className="px-3 py-2 font-bold">{parseInlineFormatting(h.trim())}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {rows.map((row, rIdx) => (
+                    <tr key={rIdx} className="hover:bg-white/5 transition-colors">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-3 py-1.5 text-gray-200">{parseInlineFormatting(cell.trim())}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        return lines.map((line, lIdx) => {
+          const cleanLine = line.trim();
+          if (!cleanLine) return null;
+
+          if (cleanLine.startsWith('### ')) {
+            return (
+              <h4 key={`${keyPrefix}_${pIdx}_${lIdx}`} className="text-sm font-bold text-[#00F0FF] tracking-wide mt-3 mb-1.5 flex items-center">
+                {parseInlineFormatting(cleanLine.replace(/^###\s+/, ''))}
+              </h4>
+            );
           }
-          return bSeg;
+          if (cleanLine.startsWith('## ')) {
+            return (
+              <h3 key={`${keyPrefix}_${pIdx}_${lIdx}`} className="text-base font-bold text-white tracking-wide mt-3.5 mb-2">
+                {parseInlineFormatting(cleanLine.replace(/^##\s+/, ''))}
+              </h3>
+            );
+          }
+          if (cleanLine.startsWith('# ')) {
+            return (
+              <h2 key={`${keyPrefix}_${pIdx}_${lIdx}`} className="text-lg font-extrabold text-white tracking-tight mt-4 mb-2">
+                {parseInlineFormatting(cleanLine.replace(/^#\s+/, ''))}
+              </h2>
+            );
+          }
+
+          if (cleanLine.startsWith('- ') || cleanLine.startsWith('* ') || cleanLine.startsWith('• ')) {
+            return (
+              <div key={`${keyPrefix}_${pIdx}_${lIdx}`} className="flex items-start space-x-2 my-1 text-xs text-gray-200 pl-1 leading-relaxed">
+                <span className="text-[#00F0FF] mt-1 text-[8px]">●</span>
+                <div className="flex-1">{parseInlineFormatting(cleanLine.replace(/^[-*•]\s+/, ''))}</div>
+              </div>
+            );
+          }
+
+          const numMatch = cleanLine.match(/^(\d+)\.\s+(.*)/);
+          if (numMatch) {
+            return (
+              <div key={`${keyPrefix}_${pIdx}_${lIdx}`} className="flex items-start space-x-2 my-1 text-xs text-gray-200 pl-1 leading-relaxed">
+                <span className="text-[#00F0FF] font-mono font-bold text-xs">{numMatch[1]}.</span>
+                <div className="flex-1">{parseInlineFormatting(numMatch[2])}</div>
+              </div>
+            );
+          }
+
+          return (
+            <p key={`${keyPrefix}_${pIdx}_${lIdx}`} className="text-xs text-gray-200 leading-relaxed select-text my-1">
+              {parseInlineFormatting(cleanLine)}
+            </p>
+          );
         });
       });
     };
 
-    // Handle code blocks (simple format)
-    const segments = escaped.split('```');
-    return segments.map((seg, idx) => {
-      if (idx % 2 === 1) {
-        // Code segment
-        return (
-          <pre key={idx} className="my-2 p-3 bg-black/40 border border-white/10 rounded-xl overflow-x-auto text-xs text-[#00F0FF] font-mono leading-relaxed select-text">
-            <code>{seg.trim()}</code>
-          </pre>
+    while ((blockMatch = codeBlockRegex.exec(text)) !== null) {
+      if (blockMatch.index > lastIdx) {
+        const textBefore = text.substring(lastIdx, blockMatch.index);
+        segments.push(renderTextSegment(textBefore, `pre_${lastIdx}`));
+      }
+
+      const lang = (blockMatch[1] || '').trim().toLowerCase();
+      const code = (blockMatch[2] || '').trim();
+
+      if (lang === 'mermaid' || (!lang && (code.startsWith('graph ') || code.startsWith('flowchart ')))) {
+        // Render interactive Mermaid Flowchart/Diagram
+        segments.push(<MermaidViewer key={`mermaid_${blockMatch.index}`} chart={code} />);
+      } else {
+        // Render standard syntax code block
+        segments.push(
+          <div key={`code_${blockMatch.index}`} className="my-2.5 rounded-xl bg-[#090f1d] border border-white/10 overflow-hidden shadow-md">
+            {lang && (
+              <div className="px-3 py-1 bg-white/5 border-b border-white/5 text-[10px] font-mono text-[#00F0FF] uppercase tracking-wider">
+                {lang}
+              </div>
+            )}
+            <pre className="p-3 text-xs font-mono text-gray-200 overflow-x-auto">
+              <code>{code}</code>
+            </pre>
+          </div>
         );
       }
-      
-      const lines = seg.split('\n');
-      return lines.map((line, lIdx) => {
-        let cleanLine = line.trim();
 
-        // 1. Headers detection
-        if (cleanLine.startsWith('### ')) {
-          return (
-            <h3 key={lIdx} className="text-sm font-black text-white mt-4 mb-2 tracking-wide select-text">
-              {parseInlineFormatting(cleanLine.substring(4))}
-            </h3>
-          );
-        }
-        if (cleanLine.startsWith('## ')) {
-          return (
-            <h2 key={lIdx} className="text-base font-black text-white mt-5 mb-2 pb-1 border-b border-white/5 tracking-wide select-text">
-              {parseInlineFormatting(cleanLine.substring(3))}
-            </h2>
-          );
-        }
-        if (cleanLine.startsWith('# ')) {
-          return (
-            <h1 key={lIdx} className="text-lg font-black text-white mt-6 mb-3 tracking-tight select-text">
-              {parseInlineFormatting(cleanLine.substring(2))}
-            </h1>
-          );
-        }
+      lastIdx = codeBlockRegex.lastIndex;
+    }
 
-        // 2. Blockquote / Flowchart step detection
-        if (cleanLine.startsWith('&gt; ') || cleanLine.startsWith('> ')) {
-          const content = cleanLine.startsWith('&gt; ') ? cleanLine.substring(5) : cleanLine.substring(2);
-          return (
-            <div key={lIdx} className="border-l-2 border-[#00F0FF]/50 pl-3 my-2 text-[#00F0FF] font-semibold italic text-xs leading-relaxed select-text bg-[#00F0FF]/5 py-1 rounded-r-lg">
-              {parseInlineFormatting(content)}
-            </div>
-          );
-        }
+    if (lastIdx < text.length) {
+      segments.push(renderTextSegment(text.substring(lastIdx), `post_${lastIdx}`));
+    }
 
-        // 3. Bullet list detection
-        const isBullet = cleanLine.startsWith('- ') || cleanLine.startsWith('* ') || cleanLine.startsWith('• ');
-        if (isBullet) {
-          const content = cleanLine.substring(2);
-          return (
-            <div key={lIdx} className="flex items-start space-x-2 my-1 pl-2">
-              <span className="text-[#00F0FF] mt-1.5">•</span>
-              <span className="text-sm text-gray-300 flex-1 select-text">
-                {parseInlineFormatting(content)}
-              </span>
-            </div>
-          );
-        }
-
-        // 4. Default paragraph
-        return (
-          <p key={lIdx} className="text-sm text-gray-300 min-h-[1.25rem] leading-relaxed select-text">
-            {parseInlineFormatting(cleanLine)}
-          </p>
-        );
-      });
-    });
+    return segments;
   };
 
-
   return (
-    <div className="flex flex-col h-full bg-[#040812]/95 backdrop-blur-md rounded-b-3xl">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-premium">
+    <div className="flex flex-col h-full bg-[#080e1a]/95 backdrop-blur-md rounded-b-3xl">
+      {/* Messages Feed */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 scrollbar-premium">
+        {/* Date Divider (Copilot-Style) */}
+        <div className="flex items-center justify-center my-2">
+          <div className="h-[1px] bg-white/5 flex-1"></div>
+          <span className="px-3 text-[10px] text-gray-400 font-medium tracking-wider uppercase">Today</span>
+          <div className="h-[1px] bg-white/5 flex-1"></div>
+        </div>
+
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4 py-8 space-y-4">
-            <h3 className="text-lg font-bold text-white tracking-wide">Hey, what’s on your mind today?</h3>
-            <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
-              Ask about the platform, find learning content, or upload an image for help.
-            </p>
-            <div className="grid grid-cols-1 gap-2 w-full max-w-sm mt-4">
-              {['Help me find notes', 'Where are my saved videos?', 'Explain this topic', 'How do I upload content?'].map(prompt => (
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00F0FF]/20 to-[#8B5CF6]/20 border border-white/10 flex items-center justify-center text-[#00F0FF] shadow-lg">
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white tracking-wide">How can I help you today?</h3>
+              <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+                Ask about JEE, NEET, solve problems, analyze diagrams, or explore concepts.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 w-full max-w-xs mt-3">
+              {[
+                'Explain Newton’s laws of motion',
+                'What is the structure of DNA?',
+                'Who is the father of biotechnology?',
+                'Help me solve a calculus problem'
+              ].map(prompt => (
                 <button 
                   key={prompt}
                   onClick={() => handleSend(prompt)}
-                  className="w-full px-4 py-2.5 bg-[#0D213A]/50 hover:bg-[#0D213A] border border-white/5 rounded-2xl text-xs text-left text-[#00F0FF] transition-all hover:border-[var(--color-cyan)]/30"
+                  className="w-full px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-[#00F0FF]/30 rounded-xl text-xs text-left text-gray-300 hover:text-white transition-all flex items-center justify-between group"
                 >
-                  {prompt}
+                  <span className="truncate">{prompt}</span>
+                  <span className="text-gray-500 group-hover:text-[#00F0FF] text-[10px]">↗</span>
                 </button>
               ))}
             </div>
           </div>
         ) : (
           messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                msg.role === 'user' 
-                  ? 'bg-gradient-to-br from-[#00F0FF]/15 to-[#FF00FF]/15 border border-white/10 text-white rounded-br-sm' 
-                  : 'bg-[#0D213A] border border-white/5 text-gray-200 rounded-bl-sm'
-              }`}>
-                {msg.image && (
-                  <div className="mb-2.5 rounded-xl overflow-hidden border border-white/10">
-                    <img src={msg.image} alt="Doubt Upload" className="max-h-48 w-auto object-contain" />
+            <div key={msg.id} className="space-y-1">
+              {msg.role === 'user' ? (
+                /* User Message (Right-aligned sleek pill) */
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] bg-[#131d33] border border-white/10 text-white rounded-2xl px-4 py-2.5 shadow-sm">
+                    {msg.image && (
+                      <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
+                        <img src={msg.image} alt="Upload" className="max-h-40 w-auto object-contain" />
+                      </div>
+                    )}
+                    {msg.filename && (
+                      <div className="flex items-center space-x-1.5 text-xs text-[#00F0FF] mb-1 font-mono">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[180px]">{msg.filename}</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-100 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   </div>
-                )}
-                
-                <div className="space-y-1">
-                  {renderFormattedText(msg.content)}
                 </div>
-                
-                {/* Google Search Citations */}
-                {msg.citations && msg.citations.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-white/10">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-500 mb-1.5 block">Sources found</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {msg.citations.map((cite, i) => (
-                        <a 
-                          key={i} 
-                          href={cite.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="flex items-center space-x-1 px-2.5 py-1 bg-white/5 hover:bg-[#00F0FF]/10 hover:text-[#00F0FF] rounded-lg text-[10px] text-gray-300 border border-white/5 transition-all"
-                        >
-                          <span className="truncate max-w-[140px] font-medium">{cite.title}</span>
-                        </a>
-                      ))}
+              ) : (
+                /* Assistant Message (Copilot-Style Left presentation) */
+                <div className="flex justify-start">
+                  <div className="w-full space-y-2 py-1">
+                    <div className="text-xs text-gray-200 leading-relaxed select-text space-y-1">
+                      {renderFormattedText(msg.content)}
                     </div>
-                  </div>
-                )}
 
-                {/* Speech Tool */}
-                {msg.role === 'assistant' && msg.content !== '...' && (
-                  <div className="mt-2.5 flex items-center justify-between border-t border-white/5 pt-1.5">
-                    {msg.mode && <span className="text-[9px] text-[#00F0FF]/60 uppercase tracking-widest font-semibold">{msg.mode}</span>}
-                    <button 
-                      onClick={() => toggleSpeech(msg.content, msg.id)}
-                      className="p-1 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white"
-                      title={speakingId === msg.id ? "Stop voice" : "Listen response"}
-                      aria-label="Read aloud"
-                    >
-                      {speakingId === msg.id ? <Square className="w-3 h-3 fill-current text-[var(--color-cyan)]" /> : <Volume2 className="w-3.5 h-3.5" />}
-                    </button>
+                    {/* Citations */}
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-2.5 pt-2 border-t border-white/5">
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 mb-1.5 block">Verified Sources</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {msg.citations.map((cite, i) => (
+                            <a 
+                              key={i} 
+                              href={cite.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex items-center space-x-1 px-2.5 py-1 bg-white/5 hover:bg-[#00F0FF]/10 hover:text-[#00F0FF] rounded-lg text-[10px] text-gray-300 border border-white/5 transition-all"
+                            >
+                              <span className="truncate max-w-[140px] font-medium">{cite.title}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Copilot-Style Action Icons Bar */}
+                    {msg.content !== '...' && (
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                        <div className="flex items-center space-x-1">
+                          {/* Feedback Thumbs */}
+                          <button
+                            onClick={() => setFeedback(prev => ({ ...prev, [msg.id]: 'up' }))}
+                            className={`p-1.5 rounded-lg transition-colors ${feedback[msg.id] === 'up' ? 'text-[#00F0FF] bg-[#00F0FF]/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            title="Helpful"
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setFeedback(prev => ({ ...prev, [msg.id]: 'down' }))}
+                            className={`p-1.5 rounded-lg transition-colors ${feedback[msg.id] === 'down' ? 'text-red-400 bg-red-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            title="Not helpful"
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                          </button>
+                          {/* Copy */}
+                          <button 
+                            onClick={() => handleCopy(msg.content, msg.id)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                            title="Copy text"
+                          >
+                            {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-[#00F0FF]" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          {/* Text-to-speech */}
+                          <button 
+                            onClick={() => toggleSpeech(msg.content, msg.id)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                            title={speakingId === msg.id ? "Stop reading" : "Read aloud"}
+                          >
+                            {speakingId === msg.id ? <Square className="w-3.5 h-3.5 text-[#00F0FF]" /> : <Volume2 className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        {/* Mode Badge */}
+                        {msg.mode && (
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-gray-400 px-2 py-0.5 bg-white/5 rounded-md border border-white/5">
+                            {msg.mode}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Composer */}
-      <div className="p-4 border-t border-white/10 bg-[#070e1b] rounded-b-3xl relative">
-        {/* Local Image Preview */}
+      {/* Copilot-Style Modern Capsule Input Box */}
+      <div className="p-3 border-t border-white/5 bg-[#050a14] rounded-b-3xl">
+        {/* Attachment preview float */}
         <AnimatePresence>
-          {image && (
+          {attachment && (
             <motion.div 
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 15 }}
-              className="absolute -top-20 left-4 p-1.5 bg-[#0D213A] border border-white/10 rounded-xl shadow-2xl flex items-start space-x-2"
+              exit={{ opacity: 0, y: 10 }}
+              className="mb-2 p-2 bg-[#0D213A] border border-white/10 rounded-2xl shadow-xl flex items-center justify-between"
             >
-              <img src={image.base64} alt="Upload Thumbnail" className="h-14 w-14 object-cover rounded-lg" />
+              <div className="flex items-center space-x-2 min-w-0">
+                {attachment.type === 'image' ? (
+                  <img src={attachment.base64} alt="Attachment" className="h-10 w-10 object-cover rounded-lg border border-white/10" />
+                ) : (
+                  <div className="h-10 w-10 bg-white/5 rounded-lg flex items-center justify-center text-[#00F0FF]">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs text-white font-medium truncate max-w-[200px]">{attachment.file.name}</p>
+                  <p className="text-[10px] text-gray-400">{(attachment.file.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
               <button 
-                onClick={() => setImage(null)} 
-                className="p-1 bg-red-500 rounded-full hover:bg-red-600 text-white transition-colors"
-                title="Remove image"
+                onClick={() => setAttachment(null)}
+                className="p-1 text-gray-400 hover:text-red-400 rounded-lg transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X className="w-4 h-4" />
               </button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="flex items-end bg-[#0D213A] border border-white/10 rounded-2xl p-2 focus-within:border-[#00F0FF]/50 transition-colors">
+        {/* Outer Capsule Container */}
+        <div className="bg-[#0e1626] border border-white/10 rounded-2xl p-2.5 focus-within:border-[#00F0FF]/40 shadow-inner transition-all">
           <input 
             type="file" 
             ref={fileInputRef} 
-            onChange={handleImageUpload} 
-            accept="image/jpeg, image/png, image/webp"
+            onChange={handleFileUpload} 
+            accept="image/jpeg, image/png, image/webp, application/pdf"
             className="hidden" 
           />
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-gray-400 hover:text-[#00F0FF] transition-colors rounded-xl"
-            title="Upload image (Max 10MB)"
-            aria-label="Attach file"
-          >
-            <ImageIcon className="w-5 h-5" />
-          </button>
-          
-          <div className="flex-1 ml-1">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask Bone AI anything..."
-              className="w-full bg-transparent border-none text-white text-sm focus:ring-0 resize-none py-2 max-h-32 min-h-[38px] outline-none"
-              rows={1}
-            />
-          </div>
 
-          <div className="flex items-center space-x-2 ml-2">
-            {/* Mode Picker dropdown */}
-            <div className="relative">
+          {/* Top Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="Message Bone AI or ask a question..."
+            className="w-full bg-transparent border-0 text-white text-xs placeholder:text-gray-500 focus:outline-none resize-none min-h-[36px] max-h-24 px-1"
+            rows={1}
+          />
+
+          {/* Bottom Action Bar */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+            {/* Left Controls: Plus icon + Mode pill */}
+            <div className="flex items-center space-x-1.5">
+              {/* + Attachment Button */}
               <button 
-                onClick={() => setIsModeOpen(!isModeOpen)}
-                className="flex items-center space-x-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold text-gray-300 transition-colors"
-                title="Select Mode"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors border border-white/5"
+                title="Attach Image or PDF"
               >
-                <span>{mode}</span>
-                <ChevronDown className="w-3 h-3 text-[#00F0FF]" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
-              
-              <AnimatePresence>
-                {isModeOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setIsModeOpen(false)} />
-                    <motion.div 
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 5 }}
-                      className="absolute bottom-full right-0 mb-2 w-44 bg-[#0D213A] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-20"
-                    >
-                      {MODES.map(m => (
-                        <button
-                          key={m}
-                          onClick={() => { setMode(m); setIsModeOpen(false); }}
-                          className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${mode === m ? 'bg-[#00F0FF]/15 text-[#00F0FF] font-bold' : 'text-gray-300 hover:bg-white/5'}`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
+
+              {/* Mode Selector Pill */}
+              <div className="relative">
+                <button 
+                  type="button"
+                  onClick={() => setIsModeOpen(!isModeOpen)}
+                  className="flex items-center space-x-1 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-[11px] font-medium text-gray-300 border border-white/5 transition-colors"
+                >
+                  <span>{mode}</span>
+                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                </button>
+
+                <AnimatePresence>
+                  {isModeOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsModeOpen(false)} />
+                      <motion.div 
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 5 }}
+                        className="absolute bottom-full left-0 mb-2 w-52 bg-[#0c1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-20 p-1.5 space-y-1"
+                      >
+                        {MODES.map(m => {
+                          const Icon = m.icon;
+                          const isSelected = mode === m.name;
+                          return (
+                            <button
+                              key={m.name}
+                              type="button"
+                              onClick={() => { setMode(m.name); setIsModeOpen(false); }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-all flex items-center space-x-2.5 ${
+                                isSelected ? 'bg-[#00F0FF]/15 text-[#00F0FF] font-semibold' : 'text-gray-300 hover:bg-white/5'
+                              }`}
+                            >
+                              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium leading-none">{m.name}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5 truncate">{m.desc}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
-            <button 
-              onClick={() => handleSend()}
-              disabled={isGenerating || (!inputText.trim() && !image)}
-              className="p-2.5 bg-gradient-to-r from-[#00F0FF] to-[#0099FF] text-[#040812] rounded-xl hover:shadow-[0_0_15px_rgba(0,240,255,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all"
-              aria-label="Send query"
-              title="Send Message"
-            >
-              {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4.5 h-4.5" />}
-            </button>
+            {/* Right Controls: Mic + Send */}
+            <div className="flex items-center space-x-1.5">
+              <button 
+                type="button"
+                onClick={toggleVoiceInput}
+                className={`p-1.5 rounded-lg transition-all ${
+                  isListening 
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+                title={isListening ? "Listening... (Click to stop)" : "Speech to text"}
+              >
+                {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => handleSend()}
+                disabled={isGenerating || (!inputText.trim() && !attachment)}
+                className="p-1.5 bg-[#00F0FF] hover:bg-[#38bdf8] text-[#040812] rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md"
+                title="Send Message"
+              >
+                {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>
