@@ -108,7 +108,7 @@ export const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 px-2.5 sm:px-4 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 pl-2.5 pr-4 sm:px-6 flex items-center justify-between">
       {/* Left side: Logo & Mobile Toggle */}
       <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
         <button
@@ -169,27 +169,8 @@ export const TopBar: React.FC = () => {
 
 
 
-      {/* Right side: Learning Library, Search, Theme, Background, Profile */}
-      <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-        {/* Mobile Learning Library / Saved Items */}
-        <button
-          onClick={() => setIsSavedItemsOpen(true)}
-          className="md:hidden p-1.5 sm:p-2 rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] text-[var(--color-cyan)] hover:text-white transition-all active:scale-95 flex items-center justify-center flex-shrink-0 shadow-sm"
-          title="Open Learning Library (Saved Items) 🔖"
-          aria-label="Open Learning Library"
-        >
-          <Bookmark className="w-4 h-4 text-[var(--color-cyan)]" />
-        </button>
-
-        {/* Mobile Search Button */}
-        <button
-          onClick={() => setIsSearchOpen(true)}
-          className="md:hidden p-1.5 sm:p-2 rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] text-[var(--text-secondary)] hover:text-white transition-all active:scale-95 flex items-center justify-center flex-shrink-0 shadow-sm"
-          title="Search"
-          aria-label="Search"
-        >
-          <Search className="w-4 h-4" />
-        </button>
+      {/* Right side: Streak, Apples, Profile */}
+      <div className="flex items-center space-x-1.5 sm:space-x-3 flex-shrink-0">
 
 
 
@@ -291,6 +272,18 @@ export const TopBar: React.FC = () => {
               >
                 <User className="w-4 h-4 text-[var(--color-primary)]" />
                 <span>Profile settings</span>
+              </button>
+
+              {/* Mobile Saved Items */}
+              <button
+                onClick={() => {
+                  setIsSavedItemsOpen(true);
+                  setProfileDropdownOpen(false);
+                }}
+                className="md:hidden w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-surface-secondary)] rounded-xl transition-colors"
+              >
+                <Bookmark className="w-4 h-4 text-[var(--color-cyan)]" />
+                <span>Learning Library (Saved)</span>
               </button>
 
               {/* Theme Cycle Button */}
