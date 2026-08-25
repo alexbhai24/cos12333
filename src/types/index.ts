@@ -24,6 +24,7 @@ export interface UserProfileDoc {
   streakFreezes?: number;
   streakHistory?: string[];
   frozenDates?: string[];
+  completedTestIds?: string[];
 }
 
 export type Theme =
@@ -105,6 +106,7 @@ export interface UserProfile {
   streakHistory?: string[];
   frozenDates?: string[];
   claimedMilestones?: number[];
+  completedTestIds?: string[];
   savedItemIds?: string[];
   uid?: string;
   displayName?: string;
@@ -307,3 +309,4 @@ export interface AIMessage {
   sources?: string[];
   suggestedFollowups?: string[];
 }
+
