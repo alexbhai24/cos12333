@@ -28,7 +28,9 @@ export const HomePage: React.FC = () => {
     posts,
     savedItemIds,
     setIsBoneAIOpen,
-    setIsSavedItemsOpen
+    setIsSavedItemsOpen,
+    setIsStreakDrawerOpen,
+    setIsAppleShopOpen
   } = useApp();
 
   // Inject CommonNinja SDK script once
@@ -280,30 +282,51 @@ export const HomePage: React.FC = () => {
                 <Trophy className="w-4 h-4 text-amber-400" />
                 <span>Rewards Overview</span>
               </div>
-              <span className="text-[10px] text-[var(--text-muted)]">Synced</span>
+              <span className="text-[10px] text-[var(--text-muted)] font-mono">Synced</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] rounded-2xl text-center">
-                <div className="text-[10px] text-[var(--text-muted)] font-semibold mb-0.5">Daily Streak</div>
-                <div className="text-lg font-black text-amber-400 flex items-center justify-center gap-1">
-                  <Flame className="w-4 h-4 text-orange-500 animate-pulse" />
-                  <span>{user?.streak || 0} Days</span>
-                </div>
-              </div>
+              {/* Daily Streak Trigger */}
+              {(() => {
+                const todayString = new Date().toISOString().split('T')[0];
+                const isStreakCompletedToday = user?.streakHistory?.includes(todayString);
+                return (
+                  <button
+                    onClick={() => setIsStreakDrawerOpen(true)}
+                    type="button"
+                    className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-orange-500/50 hover:bg-orange-500/10 rounded-2xl text-center transition-all cursor-pointer group active:scale-95 text-left flex flex-col items-center justify-center shadow-sm"
+                    title="Click to view Cosmic Streak Society & Check-In 🔥"
+                  >
+                    <div className="text-[10px] text-[var(--text-muted)] group-hover:text-orange-300 font-semibold mb-0.5 transition-colors">Daily Streak</div>
+                    <div className={`text-lg font-black ${isStreakCompletedToday ? 'text-amber-400' : 'text-gray-400'} flex items-center justify-center gap-1 group-hover:scale-105 transition-transform`}>
+                      <Flame className={`w-4 h-4 ${isStreakCompletedToday ? 'text-orange-500 animate-pulse drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]' : 'text-gray-500 grayscale opacity-75'}`} />
+                      <span>{user?.streak || 0} Days</span>
+                    </div>
+                  </button>
+                );
+              })()}
 
-              <div className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] rounded-2xl text-center">
-                <div className="text-[10px] text-[var(--text-muted)] font-semibold mb-0.5">Apples Balance</div>
-                <div className="text-lg font-black text-emerald-450 flex items-center justify-center gap-1">
-                  <span>🍎</span>
+              {/* Apples Balance Trigger */}
+              <button
+                onClick={() => setIsAppleShopOpen(true)}
+                type="button"
+                className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-2xl text-center transition-all cursor-pointer group active:scale-95 text-left flex flex-col items-center justify-center shadow-sm"
+                title="Click to open Apple Shop & Vault 🍏"
+              >
+                <div className="text-[10px] text-[var(--text-muted)] group-hover:text-emerald-300 font-semibold mb-0.5 transition-colors">Apples Balance</div>
+                <div className="text-lg font-black text-emerald-400 flex items-center justify-center gap-1 group-hover:scale-105 transition-transform">
+                  <span className="drop-shadow-[0_0_6px_rgba(74,222,128,0.4)]">{(user?.apples || 0) > 100 ? '🍎' : '🍏'}</span>
                   <span>{user?.apples || 0}</span>
                 </div>
-              </div>
+              </button>
             </div>
 
+            {/* Saved Items Library Trigger */}
             <button
               onClick={() => setIsSavedItemsOpen(true)}
-              className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 rounded-xl transition-all flex items-center justify-center space-x-2"
+              type="button"
+              className="w-full py-2.5 bg-white/5 hover:bg-[var(--color-cyan)]/15 border border-white/10 hover:border-[var(--color-cyan)]/40 text-xs font-bold text-gray-300 hover:text-white rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow-sm"
+              title="Open Learning Library (Saved Items) 🔖"
             >
               <Book className="w-4 h-4 text-[var(--color-cyan)]" />
               <span>Saved Items Library ({savedItemIds.length})</span>
