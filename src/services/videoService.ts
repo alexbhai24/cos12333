@@ -1,18 +1,19 @@
 import {
   collection,
   doc,
+  setDoc,
   addDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   query,
   where,
-  orderBy,
   serverTimestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import type { UserProfileDoc } from '../types';
+import { normalizeGrade } from '../utils/gradeUtils';
 
 export interface VideoDoc {
   id: string;
@@ -77,18 +78,29 @@ export function extractYoutubeId(input: string): string | null {
   return match ? match[1] : null;
 }
 
+const convertTimestampToISO = (ts: any): string => {
+  if (!ts) return new Date().toISOString();
+  if (typeof ts.toISOString === 'function') return ts.toISOString();
+  if (typeof ts.toDate === 'function') return ts.toDate().toISOString();
+  if (ts.seconds !== undefined) return new Date(ts.seconds * 1000).toISOString();
+  if (typeof ts === 'string') return ts;
+  return new Date().toISOString();
+};
+
 export const videoService = {
   /**
    * Subscribe to videos in real-time from Firestore, filtered by target grade.
    * Merges remote Firestore videos with local storage published videos.
    */
   subscribeVideosByGrade: (grade: string, callback: (videos: VideoDoc[]) => void): Unsubscribe => {
+    // Subscribe to all published videos in Firestore, then filter and sort in memory
+    // This avoids Firestore composite index requirements and grade string casing mismatches.
     const q = query(
       collection(db, 'videos'),
-      where('status', '==', 'published'),
-      where('targetGrades', 'array-contains', grade),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'published')
     );
+
+    const normGrade = normalizeGrade(grade);
 
     return onSnapshot(
       q,
@@ -105,36 +117,56 @@ export const videoService = {
             uploadedByName: data.uploadedByName ?? '',
             uploadedByEmail: data.uploadedByEmail ?? '',
             uploadedByRole: data.uploadedByRole ?? '',
-            createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || new Date().toISOString(),
-            updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt || new Date().toISOString(),
+            createdAt: convertTimestampToISO(data.createdAt),
+            updatedAt: convertTimestampToISO(data.updatedAt),
             status: data.status ?? 'published',
             subject: data.subject ?? 'General',
             targetGrades: data.targetGrades ?? [],
           } as VideoDoc;
         });
 
-        // Merge with local published videos matching target grade
-        const local = getLocalVideos().filter((lv) => lv.targetGrades.includes(grade));
-        const combined = [...local];
-        remoteVideos.forEach((rv) => {
-          if (!combined.some((v) => v.id === rv.id || v.youtubeVideoId === rv.youtubeVideoId)) {
-            combined.push(rv);
-          }
+        // Build a set of remote IDs for deduplication
+        const remoteIds = new Set(remoteVideos.map((v) => v.id));
+        const remoteYtIds = new Set(remoteVideos.map((v) => v.youtubeVideoId).filter(Boolean));
+
+        // Keep local-only videos that haven't been synced to Firestore yet
+        const localOnlyVideos = getLocalVideos().filter(
+          (lv) => !remoteIds.has(lv.id) && !remoteYtIds.has(lv.youtubeVideoId)
+        );
+
+        // Merge: Firestore is source of truth, local-only videos appended
+        const combined = [...remoteVideos, ...localOnlyVideos];
+
+        const isAll = !grade || grade.toLowerCase() === 'all';
+
+        // Filter by grade with normalizeGrade
+        const filtered = combined.filter((v) => {
+          if (isAll) return true;
+          return v.targetGrades.some((g) => normalizeGrade(g) === normGrade || g.toLowerCase() === 'all');
         });
 
-        callback(combined);
+        // Sort by createdAt descending (newest first)
+        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        callback(filtered);
       },
       (err) => {
-        console.warn('[videoService] Firestore snapshot notice:', err);
-        // Fallback to local storage videos if Firestore subscription encounters rules block
-        const local = getLocalVideos().filter((lv) => lv.targetGrades.includes(grade));
+        console.warn('[videoService] Firestore snapshot error:', err.code, err.message);
+        const isAll = !grade || grade.toLowerCase() === 'all';
+        // Fallback to local storage videos if Firestore subscription fails
+        const local = getLocalVideos()
+          .filter((lv) => {
+            if (isAll) return true;
+            return lv.targetGrades.some((g) => normalizeGrade(g) === normGrade || g.toLowerCase() === 'all');
+          })
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         callback(local);
       }
     );
   },
 
   /**
-   * Safe video publishing. Extract YouTube ID, construct embed URLs, and save with 3-tier fallback.
+   * Safe video publishing. Extract YouTube ID, construct embed URLs, and save directly to Cloud Firestore.
    */
   uploadVideo: async (
     video: {
@@ -161,6 +193,7 @@ export const videoService = {
     const isOwnerAdmin = currentEmail.toLowerCase().trim() === 'rajanandalex1@gmail.com';
 
     const localId = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const normalizedTargetGrade = normalizeGrade(video.targetGrade);
 
     const docData: VideoDoc = {
       id: localId,
@@ -176,49 +209,26 @@ export const videoService = {
       updatedAt: new Date().toISOString(),
       status: 'published',
       subject: video.subject,
-      targetGrades: [video.targetGrade],
+      targetGrades: [normalizedTargetGrade, video.targetGrade],
     };
 
-    // Tier 1: Try Backend API (uses Firebase Admin SDK)
-    if (auth.currentUser) {
-      try {
-        const token = await auth.currentUser.getIdToken();
-        const res = await fetch('http://localhost:3001/api/videos/publish', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(video),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.id) {
-            saveLocalVideo({ ...docData, id: data.id });
-            return data.id;
-          }
-        }
-      } catch (e) {
-        console.warn('[videoService] Backend API publish notice:', e);
-      }
-    }
+    // Save locally first for 0ms instantaneous UI update
+    saveLocalVideo(docData);
 
-    // Tier 2: Try direct Cloud Firestore addDoc
+    // Direct Cloud Firestore write with docRef for universal real-time propagation across all accounts
     try {
-      const docRef = await addDoc(collection(db, 'videos'), {
+      const docRef = doc(db, 'videos', localId);
+      await setDoc(docRef, {
         ...docData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      saveLocalVideo({ ...docData, id: docRef.id });
-      return docRef.id;
+      return localId;
     } catch (fsErr: any) {
-      console.warn('[videoService] Firestore direct write notice:', fsErr);
+      console.warn('[videoService] Direct Firestore write notice:', fsErr.message);
     }
 
-    // Tier 3: Seamless Local Storage & Reactive UI Fallback
-    saveLocalVideo(docData);
-    return docData.id;
+    return localId;
   },
 
   updateVideo: async (videoId: string, title: string, subject: string, targetGrade: string): Promise<void> => {
@@ -274,10 +284,8 @@ export const videoService = {
   },
 
   subscribeAllVideos: (callback: (videos: VideoDoc[]) => void): Unsubscribe => {
-    const q = query(
-      collection(db, 'videos'),
-      orderBy('createdAt', 'desc')
-    );
+    // No orderBy — sort in JS to avoid composite index requirement
+    const q = query(collection(db, 'videos'));
     return onSnapshot(
       q,
       (snapshot) => {
@@ -293,15 +301,18 @@ export const videoService = {
             uploadedByName: data.uploadedByName ?? '',
             uploadedByEmail: data.uploadedByEmail ?? '',
             uploadedByRole: data.uploadedByRole ?? '',
-            createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || new Date().toISOString(),
-            updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt || new Date().toISOString(),
+            createdAt: convertTimestampToISO(data.createdAt),
+            updatedAt: convertTimestampToISO(data.updatedAt),
             status: data.status ?? 'published',
             subject: data.subject ?? 'General',
             targetGrades: data.targetGrades ?? [],
           } as VideoDoc;
         });
 
-        // Always sync localStorage with Firestore to purge deleted videos across all browsers
+        // Sort newest first in JS
+        remoteVideos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        // Sync localStorage so other tabs/pages reflect Firestore truth
         try {
           localStorage.setItem(LOCAL_VIDEOS_KEY, JSON.stringify(remoteVideos));
         } catch (e) {
@@ -311,7 +322,7 @@ export const videoService = {
         callback(remoteVideos);
       },
       (err) => {
-        console.warn('[videoService] Failed to subscribe to all videos:', err);
+        console.warn('[videoService] Failed to subscribe to all videos:', err.code, err.message);
         callback(getLocalVideos());
       }
     );
