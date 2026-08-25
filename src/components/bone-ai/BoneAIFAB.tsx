@@ -333,6 +333,10 @@ export const BoneAIFAB: React.FC<BoneAIFABProps> = ({ onClick, isOpen }) => {
     }
   };
 
+  if (isOpen) {
+    return null;
+  }
+
   return (
     <motion.div
       drag
@@ -582,3 +586,4 @@ export const BoneAIFAB: React.FC<BoneAIFABProps> = ({ onClick, isOpen }) => {
     </motion.div>
   );
 };
+
