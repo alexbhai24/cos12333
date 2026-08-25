@@ -101,24 +101,30 @@ export const TopBar: React.FC = () => {
     setBackground(next);
   };
 
+  const handleThemeCycle = () => {
+    const idx = themes.findIndex(t => t.id === theme);
+    const nextIdx = (idx + 1) % themes.length;
+    setTheme(themes[nextIdx].id);
+  };
+
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 px-4 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 px-2.5 sm:px-4 flex items-center justify-between">
       {/* Left side: Logo & Mobile Toggle */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
         <button
           onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
           className="lg:hidden text-[var(--text-secondary)] hover:text-white p-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)]"
           aria-label="Toggle Navigation Menu"
         >
-          {mobileDrawerOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          {mobileDrawerOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
         </button>
 
         {/* Brand Logo & Title */}
         <div
           onClick={() => setCurrentRoute('home')}
-          className="flex items-center space-x-3 cursor-pointer select-none group text-left"
+          className="flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none group text-left"
         >
-          <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg border border-white/20">
+          <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-lg border border-white/20 flex-shrink-0">
             <img
               src="/logo.png"
               alt="CosmicBone Logo"
@@ -126,168 +132,104 @@ export const TopBar: React.FC = () => {
             />
           </div>
           <div>
-            <span className="font-handwritten text-2xl text-white tracking-wide block leading-none filter drop-shadow">
+            <span className="font-handwritten text-xl sm:text-2xl text-white tracking-wide block leading-none filter drop-shadow">
               Cosmic<span className="text-[var(--color-cyan)]">Bone</span>
             </span>
-            <span className="text-[9px] font-bold text-[var(--text-muted)] tracking-widest block uppercase mt-0.5">
+            <span className="text-[7.5px] sm:text-[9px] font-bold text-[var(--text-muted)] tracking-wider sm:tracking-widest block uppercase mt-0.5">
               NEXT-GEN EDTECH
             </span>
           </div>
         </div>
 
+        {/* Desktop Search Bar & Bookmark */}
+        <div className="hidden md:flex items-center flex-1 max-w-xs xl:max-w-sm ml-4 gap-2.5">
+          <button
+            onClick={() => setIsSavedItemsOpen(true)}
+            className="p-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-gray-400 hover:text-[var(--color-cyan)] transition-all shadow-md active:scale-95 flex items-center justify-center flex-shrink-0"
+            title="Open Learning Library (Saved Items) 🔖"
+          >
+            <Bookmark className="w-4 h-4 text-[var(--color-cyan)]" />
+          </button>
+
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="w-full flex items-center justify-between px-3.5 py-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-xs text-gray-400 hover:text-white transition-all shadow-md cursor-pointer active:scale-98"
+            title="Search courses, videos, notes (Ctrl + K)"
+          >
+            <div className="flex items-center space-x-2">
+              <Search className="w-3.5 h-3.5 text-gray-400" />
+              <span className="truncate">Search courses, videos, notes…</span>
+            </div>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-semibold bg-[var(--bg-surface-solid)] text-gray-400 rounded border border-white/5">
+              Ctrl K
+            </kbd>
+          </button>
+        </div>
       </div>
 
-      {/* Center-left: Search Bar Trigger Button */}
-      <div className="hidden md:flex items-center flex-1 max-w-xs xl:max-w-sm mx-4 gap-2.5">
+
+
+      {/* Right side: Learning Library, Search, Theme, Background, Profile */}
+      <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+        {/* Mobile Learning Library / Saved Items */}
         <button
           onClick={() => setIsSavedItemsOpen(true)}
-          className="p-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-gray-400 hover:text-[var(--color-cyan)] transition-all shadow-md active:scale-95 flex items-center justify-center flex-shrink-0"
+          className="md:hidden p-1.5 sm:p-2 rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] text-[var(--color-cyan)] hover:text-white transition-all active:scale-95 flex items-center justify-center flex-shrink-0 shadow-sm"
           title="Open Learning Library (Saved Items) 🔖"
+          aria-label="Open Learning Library"
         >
-          <Bookmark className="w-4 h-4" />
+          <Bookmark className="w-4 h-4 text-[var(--color-cyan)]" />
         </button>
 
+        {/* Mobile Search Button */}
         <button
           onClick={() => setIsSearchOpen(true)}
-          className="w-full flex items-center justify-between px-3.5 py-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-xs text-gray-400 hover:text-white transition-all shadow-md cursor-pointer active:scale-98"
-          title="Search courses, videos, notes (Ctrl + K)"
+          className="md:hidden p-1.5 sm:p-2 rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] text-[var(--text-secondary)] hover:text-white transition-all active:scale-95 flex items-center justify-center flex-shrink-0 shadow-sm"
+          title="Search"
+          aria-label="Search"
         >
-          <div className="flex items-center space-x-2">
-            <Search className="w-3.5 h-3.5 text-gray-400" />
-            <span className="truncate">Search courses, videos, notes…</span>
-          </div>
-          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-semibold bg-[var(--bg-surface-solid)] text-gray-400 rounded border border-white/5">
-            Ctrl K
-          </kbd>
+          <Search className="w-4 h-4" />
         </button>
-      </div>
 
-      {/* Center: Separate Reward Buttons */}
-      <div className="hidden sm:flex items-center space-x-2.5">
+
+
         {/* Streak Button */}
-        <button
-          onClick={() => setIsStreakDrawerOpen(true)}
-          type="button"
-          className="flex items-center space-x-2 px-3 py-1.5 bg-[var(--bg-surface-solid)]/85 border border-[rgba(255,101,101,0.25)] rounded-2xl text-xs font-semibold text-white select-none transition-colors duration-150 active:bg-[var(--bg-surface-secondary)] focus:outline-none animate-pulse-slow"
-          title="Click to view Streak & Rewards"
-        >
-          <div className="w-5.5 h-5.5 flex items-center justify-center overflow-hidden">
-            <TransparentImage
-              src="/user_flame.jpg"
-              alt="Streak"
-              className="w-5 h-5 object-contain"
-            />
-          </div>
-          <span className="text-[#FF7BAC] font-bold font-mono text-sm">{user.streak}</span>
-          <span className="text-[#A5C0E6] text-[9px] tracking-wider font-heading uppercase">STREAK</span>
-        </button>
+        {(() => {
+          const todayString = new Date().toISOString().split('T')[0];
+          const isStreakCompletedToday = user?.streakHistory?.includes(todayString);
+          return (
+            <button
+              onClick={() => setIsStreakDrawerOpen(true)}
+              type="button"
+              className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full transition-all active:scale-95 group focus:outline-none ${isStreakCompletedToday ? 'bg-[#1b120c]/90 hover:bg-[#28190e] border border-orange-500/30 shadow-[0_0_12px_rgba(249,115,22,0.15)]' : 'bg-gray-800/50 hover:bg-gray-800/80 border border-gray-600/30'}`}
+              title="Click to view Streak & Rewards"
+            >
+              <span className={`text-sm sm:text-base leading-none select-none ${isStreakCompletedToday ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse' : 'grayscale opacity-75'}`}>🔥</span>
+              <span className={`${isStreakCompletedToday ? 'text-orange-400' : 'text-gray-400'} font-bold font-mono text-xs sm:text-sm`}>{user?.streak || 0}</span>
+            </button>
+          );
+        })()}
 
         {/* Apples Button */}
         <button
           onClick={() => setIsAppleShopOpen(true)}
-          type="button"
-          className="flex items-center space-x-2 px-3 py-1.5 bg-[var(--bg-surface-solid)]/85 border border-[rgba(55,217,150,0.25)] rounded-2xl text-xs font-semibold text-white select-none transition-colors duration-150 active:bg-[var(--bg-surface-secondary)] focus:outline-none"
+          className="flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#0D213A]/90 hover:bg-[#132d4e] border border-[#37D996]/30 transition-all shadow-[0_0_12px_rgba(55,217,150,0.15)] active:scale-95 group"
           title="Click to view Apple Shop & Donations"
         >
-          <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_0_2px_rgba(144,238,144,0.4)]">
-            <defs>
-              <linearGradient id="appleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#ADF044" />
-                <stop offset="50%" stopColor="#7CD917" />
-                <stop offset="100%" stopColor="#4A8C0B" />
-              </linearGradient>
-              <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#87E024" />
-                <stop offset="100%" stopColor="#3C730A" />
-              </linearGradient>
-            </defs>
-            <path d="M12 21.5c-2.3 0-5.8-1.5-5.8-6.2c0-3.3 2.1-5.3 4.8-5.3c.6 0 1 .1 1 .1s.4-.1 1-.1c2.7 0 4.8 2 4.8 5.3c0 4.7-3.5 6.2-5.8 6.2z" fill="url(#appleGrad)" />
-            <path d="M12 10c0-1.8-.8-3.2-1.3-3.7" stroke="#7A5228" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M12.5 6.3c1.8-.9 4.1-.4 4.5.9c.4 1.3-1.3 2.3-3.1 2.3c-.4 0-1.4-1.3-1.4-3.2z" fill="url(#leafGrad)" />
-          </svg>
-          <span className="text-[#37D996] font-bold font-mono text-sm">{user.apples}</span>
-          <span className="text-[#A5C0E6] text-[9px] tracking-wider font-heading uppercase">APPLES</span>
-        </button>
-      </div>
-
-      {/* Right side: Theme Logo Button, Background, Profile */}
-      <div className="flex items-center space-x-2.5">
-        <button
-          onClick={() => setIsSearchOpen(true)}
-          className="md:hidden p-2 rounded-full text-[var(--text-secondary)] hover:bg-[#0D213A] focus:outline-none"
-          title="Search"
-        >
-          <Search className="w-5 h-5" />
-        </button>
-
-        {/* Theme Changer Popover */}
-        <div className="relative" ref={themeRef}>
-          <button
-            onClick={() => setThemePopoverOpen(!themePopoverOpen)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] text-[var(--text-secondary)] hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)] active:scale-95"
-            title={`Theme: ${theme} — click to change`}
-            aria-label="Change theme"
-          >
-            <Palette className="w-4 h-4 text-[var(--color-cyan)]" />
-            <span className="hidden lg:inline text-[10px] font-semibold capitalize text-[var(--color-cyan)] max-w-[60px] truncate">
-              {theme.replace('-', ' ')}
-            </span>
-          </button>
-
-          {themePopoverOpen && (
-            <div className="absolute right-0 mt-2 w-72 bg-[var(--bg-surface-solid)]/95 backdrop-blur-2xl border border-[var(--border-color)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-3 z-50 animate-in fade-in zoom-in-95 duration-150 max-h-[80vh] overflow-y-auto scrollbar-none">
-              <div className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 px-1">
-                Select Theme ({themes.length} Presets)
-              </div>
-              <div className="space-y-1.5">
-                {themes.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setTheme(t.id);
-                      setThemePopoverOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left text-xs transition-all ${theme === t.id
-                        ? 'border-[var(--color-cyan)] bg-[var(--bg-surface-secondary)] text-white font-medium shadow-sm'
-                        : 'border-transparent hover:bg-[var(--bg-surface-secondary)]/60 text-[var(--text-secondary)]'
-                      }`}
-                  >
-                    <div className="flex items-center space-x-2.5">
-                      <div className={`w-3.5 h-3.5 rounded-full border ${t.preview}`} />
-                      <div>
-                        <div className="font-semibold capitalize">{t.label}</div>
-                        <div className="text-[10px] text-[var(--text-muted)]">{t.desc}</div>
-                      </div>
-                    </div>
-                    {theme === t.id && <Check className="w-3.5 h-3.5 text-[var(--color-cyan)]" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Background Cycle Button */}
-        <button
-          onClick={handleBgCycle}
-          className="flex items-center space-x-1.5 p-2 rounded-full bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] text-[var(--text-secondary)] hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)] active:scale-95"
-          title={`Current: ${bgLabels[background]} — click to change`}
-          aria-label="Cycle background"
-        >
-          <ImageIcon className="w-4 h-4" />
-          <span className="hidden lg:inline text-[10px] font-semibold text-[var(--color-cyan)] max-w-[80px] truncate">
-            {bgLabels[background]}
+          <span className="text-sm sm:text-base leading-none select-none drop-shadow-[0_0_6px_rgba(74,222,128,0.4)]">
+            {(user?.apples || 0) > 100 ? '🍎' : '🍏'}
           </span>
+          <span className="text-[#37D996] font-bold font-mono text-xs sm:text-sm">{user?.apples || 0}</span>
         </button>
 
         {/* User Profile Button */}
-        <div className="relative" ref={profileRef}>
+        <div className="relative flex-shrink-0" ref={profileRef}>
           <button
             onClick={() => {
               setProfileDropdownOpen(!profileDropdownOpen);
               setThemePopoverOpen(false);
             }}
-            className="flex items-center space-x-2 pl-1 pr-2 py-1 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)]"
+            className="flex items-center space-x-1.5 p-0.5 sm:pl-1 sm:pr-2 sm:py-1 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)] flex-shrink-0"
           >
             <AvatarDecoration decoration={user.decoration}>
               {(() => {
@@ -349,6 +291,30 @@ export const TopBar: React.FC = () => {
               >
                 <User className="w-4 h-4 text-[var(--color-primary)]" />
                 <span>Profile settings</span>
+              </button>
+
+              {/* Theme Cycle Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleThemeCycle();
+                }}
+                className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-surface-secondary)] rounded-xl transition-colors"
+              >
+                <Palette className="w-4 h-4 text-[var(--color-cyan)]" />
+                <span>Theme: <span className="capitalize text-[var(--color-cyan)]">{theme.replace('-', ' ')}</span></span>
+              </button>
+
+              {/* Background Cycle Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBgCycle();
+                }}
+                className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-surface-secondary)] rounded-xl transition-colors"
+              >
+                <ImageIcon className="w-4 h-4 text-purple-400" />
+                <span>Background: <span className="text-[var(--color-cyan)]">{bgLabels[background]}</span></span>
               </button>
 
               {(userRole === 'admin' || user.isAdmin) && (
