@@ -29,6 +29,7 @@ import { useModalLock } from '../hooks/useModalLock';
 export const VideosPage: React.FC = () => {
   const {
     selectedGrade,
+    setSelectedGrade,
     savedItemIds,
     toggleSaveItem,
     setActiveVideoModal,
@@ -384,6 +385,22 @@ export const VideosPage: React.FC = () => {
                     {sub}
                   </button>
                 ))}
+              </div>
+
+              {/* Grade Selector */}
+              <div className="flex items-center space-x-1 bg-[#090C22] border border-white/10 px-3 py-2 rounded-xl text-xs text-gray-300">
+                <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
+                <select
+                  value={selectedGrade}
+                  onChange={(e) => setSelectedGrade(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
+                >
+                  {grades.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Sort Dropdown */}
