@@ -77,7 +77,7 @@ export const FocusClockPage: React.FC = () => {
   const [secs, setSecs] = useState("00");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync fullscreen state with document events
   useEffect(() => {
