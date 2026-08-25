@@ -76,6 +76,8 @@ export const FocusClockPage: React.FC = () => {
   const [mins, setMins] = useState("30");
   const [secs, setSecs] = useState("00");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync fullscreen state with document events
   useEffect(() => {
@@ -85,6 +87,45 @@ export const FocusClockPage: React.FC = () => {
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
+
+  // Idle detection for hiding UI when running
+  useEffect(() => {
+    const resetIdle = () => {
+      setIsIdle(false);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        setIsIdle(true);
+      }, 3000); // 3 seconds of inactivity
+    };
+
+    // Only activate idle behavior if clock is running
+    if (clk.status === "running") {
+      resetIdle();
+      window.addEventListener("mousemove", resetIdle);
+      window.addEventListener("keydown", resetIdle);
+      window.addEventListener("touchstart", resetIdle);
+    } else {
+      setIsIdle(false);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", resetIdle);
+      window.removeEventListener("keydown", resetIdle);
+      window.removeEventListener("touchstart", resetIdle);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [clk.status]);
+
+  // Apply body class for global UI hiding (TopBar, BoneAI popup)
+  useEffect(() => {
+    if (isIdle && clk.status === "running") {
+      document.body.classList.add("focus-idle");
+    } else {
+      document.body.classList.remove("focus-idle");
+    }
+    return () => document.body.classList.remove("focus-idle");
+  }, [isIdle, clk.status]);
 
   const toggleFullscreen = () => {
     const el = document.getElementById("focus-clock-container");
@@ -206,8 +247,47 @@ export const FocusClockPage: React.FC = () => {
   const periodFocusHistory = periodHistory.filter(s => !s.isBreak);
   const periodBreakHistory = periodHistory.filter(s => s.isBreak);
 
-  const totalFocusSeconds = periodFocusHistory.reduce((acc, s) => acc + s.elapsedSeconds, 0);
-  const totalBreakSeconds = periodBreakHistory.reduce((acc, s) => acc + s.elapsedSeconds, 0);
+  let totalFocusSeconds = periodFocusHistory.reduce((acc, s) => acc + s.elapsedSeconds, 0);
+  let totalBreakSeconds = periodBreakHistory.reduce((acc, s) => acc + s.elapsedSeconds, 0);
+
+  // Real-time active session logic
+  let activeFocusSeconds = 0;
+  let activeBreakSeconds = 0;
+  
+  if (clk.status === "running" && !clk.awaitingPhaseStart) {
+    if (clk.mode === "pomodoro") {
+      const remainingMs = focusClockService.getRemainingMs();
+      const totalMs = (clk.phase === "focus" ? ((clk.focusMins * 60) + (clk.focusSecs || 0)) : (clk.breakMins * 60)) * 1000;
+      const elapsed = Math.floor((totalMs - remainingMs) / 1000);
+      if (clk.phase === "focus") {
+        activeFocusSeconds = Math.max(0, elapsed);
+      } else {
+        activeBreakSeconds = Math.max(0, elapsed);
+      }
+    } else if (clk.mode === "stopwatch") {
+      let elapsedMs = clk.stopwatchElapsedMs;
+      if (clk.stopwatchStartEpoch) {
+        elapsedMs += (Date.now() - clk.stopwatchStartEpoch);
+      }
+      activeFocusSeconds = Math.floor(elapsedMs / 1000);
+    }
+  }
+
+  // Also count paused break time (user paused during break)
+  if (clk.status === "paused" && clk.phase === "break" && !clk.awaitingPhaseStart) {
+    const totalBreakMs = clk.breakMins * 60 * 1000;
+    const pausedRemaining = clk.pausedRemainingMs ?? totalBreakMs;
+    const elapsed = Math.floor((totalBreakMs - pausedRemaining) / 1000);
+    activeBreakSeconds = Math.max(0, elapsed);
+  }
+
+  const nowTime = Date.now();
+  const includesToday = nowTime >= startPeriodTime && nowTime < endPeriodTime;
+  
+  if (includesToday) {
+    totalFocusSeconds += activeFocusSeconds;
+    totalBreakSeconds += activeBreakSeconds;
+  }
 
   const focusByTag = periodFocusHistory.reduce((acc, s) => {
     const tagExists = s.tagId ? clk.tags.some(t => t.id === s.tagId) : false;
@@ -218,6 +298,15 @@ export const FocusClockPage: React.FC = () => {
     }
     return acc;
   }, {} as Record<string, { seconds: number; tag: any }>);
+
+  // Add real-time tagged seconds
+  if (includesToday && activeFocusSeconds > 0 && clk.selectedTagId && clk.phase === "focus") {
+    const activeTag = clk.tags.find(t => t.id === clk.selectedTagId);
+    if (activeTag) {
+      if (!focusByTag[clk.selectedTagId]) focusByTag[clk.selectedTagId] = { seconds: 0, tag: activeTag };
+      focusByTag[clk.selectedTagId].seconds += activeFocusSeconds;
+    }
+  }
 
 
   const formatDurationHM = (secs: number) => {
@@ -396,7 +485,7 @@ export const FocusClockPage: React.FC = () => {
     >
       
       {/* Top Right Controls (Fullscreen and Focus/Loop indicator) */}
-      <div className="absolute top-4 right-4 flex items-center gap-4 z-20">
+      <div className={`absolute top-4 right-4 flex items-center gap-4 z-20 transition-opacity duration-700 ${isIdle && clk.status === 'running' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         {clk.mode === "pomodoro" && (
           <div className="flex flex-col items-end justify-center space-y-0.5">
             <div className="text-[10px] tracking-[0.2em] font-black uppercase text-right" style={{ color: accent }}>
@@ -483,7 +572,7 @@ export const FocusClockPage: React.FC = () => {
         {/* Enlarged Tag Display Pill */}
         <button
           onClick={() => setShowTagPicker(true)}
-          className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#121316] border border-white/5 hover:border-white/10 transition-all text-sm font-bold shadow-lg"
+          className={`flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#121316] border border-white/5 hover:border-white/10 transition-all duration-700 text-sm font-bold shadow-lg ${isIdle && clk.status === 'running' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
         >
           <span 
             className="w-3 h-3 rounded-full animate-pulse" 
@@ -507,7 +596,7 @@ export const FocusClockPage: React.FC = () => {
 
 
       {/* Bottom controls row */}
-      <div className="flex-shrink-0 flex items-center gap-4 pb-6 relative z-30">
+      <div className={`flex-shrink-0 flex items-center gap-4 pb-6 relative z-30 transition-opacity duration-700 ${isIdle && clk.status === 'running' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <style>{`
           .custom-thumb-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -993,29 +1082,44 @@ export const FocusClockPage: React.FC = () => {
       )}
 
       {/* ────────────────────────────────────────────────────────
-          STATISTICS MODAL (100% Mockup Match)
+          STATISTICS MODAL — Premium Apple-Style Design
           ──────────────────────────────────────────────────────── */}
       {showStats && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-transparent p-4 pointer-events-none">
-          <div className="bg-[#121316] border border-white/5 rounded-[32px] w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto scrollbar-thin shadow-2xl pointer-events-auto">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 pointer-events-auto">
+          <div className="bg-[#0D0E12]/95 backdrop-blur-2xl border border-white/[0.06] rounded-[28px] w-full max-w-2xl p-5 space-y-3.5 max-h-[90vh] overflow-y-auto scrollbar-thin shadow-[0_32px_80px_rgba(0,0,0,0.8)] pointer-events-auto">
+            
+            {/* Header */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-white uppercase tracking-wider">Statistics</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-[#FFB800] to-[#FF6B00] flex items-center justify-center shadow-lg shadow-[#FFB800]/20">
+                  <BarChart2 className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
+                </div>
+                <span className="text-sm font-bold text-white tracking-wide">Statistics</span>
+                {clk.status === "running" && includesToday && (
+                  <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE
+                  </span>
+                )}
+              </div>
               <button 
                 onClick={() => { setShowStats(false); setStatsDateOffset(0); }} 
-                className="text-gray-500 hover:text-white transition-colors"
+                className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-500 hover:text-white transition-all"
               >
-                <X className="w-5 h-5"/>
+                <X className="w-3.5 h-3.5"/>
               </button>
             </div>
 
-            {/* Period selector */}
-            <div className="flex gap-1 bg-[#1E2025] p-1 rounded-xl">
+            {/* Period selector — Apple segmented control */}
+            <div className="flex gap-0.5 bg-white/[0.03] p-1 rounded-xl border border-white/[0.04]">
               {(["day", "week", "month", "year"] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => { setStatsPeriod(p); setStatsDateOffset(0); }}
-                  className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                    statsPeriod === p ? "bg-[#2D3039] text-white" : "text-gray-500 hover:text-gray-300"
+                  className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+                    statsPeriod === p 
+                      ? "bg-white/10 text-white shadow-sm" 
+                      : "text-gray-600 hover:text-gray-400"
                   }`}
                 >
                   {p}
@@ -1024,95 +1128,184 @@ export const FocusClockPage: React.FC = () => {
             </div>
 
             {/* Date navigation */}
-            <div className="flex items-center justify-between text-xs text-[#9CA3AF] px-2 py-1 bg-[#17181D]/30 border border-white/5 rounded-2xl">
-              <button onClick={() => setStatsDateOffset(o => o - 1)} className="hover:text-white transition-colors p-1 text-base">◄</button>
-              <span className="font-bold text-white/90 text-xs tracking-wide">{dateRangeLabel}</span>
-              <button onClick={() => setStatsDateOffset(o => o + 1)} className="hover:text-white transition-colors p-1 text-base">►</button>
+            <div className="flex items-center justify-between text-xs px-3 py-1.5 bg-white/[0.02] border border-white/[0.04] rounded-xl">
+              <button onClick={() => setStatsDateOffset(o => o - 1)} className="text-gray-500 hover:text-white transition-colors p-0.5 text-sm font-bold">‹</button>
+              <span className="font-semibold text-white/80 text-[11px] tracking-wide">{dateRangeLabel}</span>
+              <button onClick={() => setStatsDateOffset(o => o + 1)} className="text-gray-500 hover:text-white transition-colors p-0.5 text-sm font-bold">›</button>
             </div>
 
-            <div className="flex gap-3">
-              <div className="flex-1 bg-[#17181D] rounded-2xl p-4 flex flex-col gap-1 shadow-sm border border-white/5">
-                <span className="text-gray-500 text-[10px] font-extrabold uppercase tracking-wider">Focus duration</span>
-                {formatDurationHM(totalFocusSeconds)}
+            {/* Duration Cards — Glass Morphism */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {/* Focus Duration */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#1A1B20] to-[#12131A] rounded-2xl p-3.5 border border-white/[0.04]">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-[#FFB800]/8 to-transparent rounded-bl-full" />
+                <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest block mb-1">Focus</span>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-white text-2xl font-black tabular-nums">{Math.floor(totalFocusSeconds / 3600)}</span>
+                  <span className="text-gray-500 text-[9px] font-bold mr-1">h</span>
+                  <span className="text-white text-2xl font-black tabular-nums">{String(Math.floor((totalFocusSeconds % 3600) / 60)).padStart(2,'0')}</span>
+                  <span className="text-gray-500 text-[9px] font-bold">m</span>
+                </div>
               </div>
-              <div className="flex-1 bg-[#17181D] rounded-2xl p-4 flex flex-col gap-1 shadow-sm border border-white/5">
-                <span className="text-gray-500 text-[10px] font-extrabold uppercase tracking-wider">Break duration</span>
-                {formatDurationHM(totalBreakSeconds)}
+              
+              {/* Break Duration */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#1A1B20] to-[#12131A] rounded-2xl p-3.5 border border-white/[0.04]">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-[#8B5CF6]/8 to-transparent rounded-bl-full" />
+                <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest block mb-1">Break</span>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-white text-2xl font-black tabular-nums">{Math.floor(totalBreakSeconds / 3600)}</span>
+                  <span className="text-gray-500 text-[9px] font-bold mr-1">h</span>
+                  <span className="text-white text-2xl font-black tabular-nums">{String(Math.floor((totalBreakSeconds % 3600) / 60)).padStart(2,'0')}</span>
+                  <span className="text-gray-500 text-[9px] font-bold">m</span>
+                </div>
+              </div>
+
+              {/* Sessions Count */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#1A1B20] to-[#12131A] rounded-2xl p-3.5 border border-white/[0.04]">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/8 to-transparent rounded-bl-full" />
+                <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest block mb-1">Sessions</span>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-white text-2xl font-black tabular-nums">{periodFocusHistory.length + (activeFocusSeconds > 0 && includesToday ? 1 : 0)}</span>
+                  <span className="text-gray-500 text-[9px] font-bold ml-0.5">total</span>
+                </div>
               </div>
             </div>
 
-            {totalFocusSeconds === 0 ? (
-              <div className="text-gray-500 text-sm text-center py-12 bg-[#17181D]/30 rounded-3xl border border-white/5">No sessions for this period.</div>
+
+            {/* Focus vs Break Ratio Bar */}
+            {(totalFocusSeconds > 0 || totalBreakSeconds > 0) && (() => {
+              const total = totalFocusSeconds + totalBreakSeconds;
+              const focusPct = Math.round((totalFocusSeconds / total) * 100);
+              const breakPct = 100 - focusPct;
+              return (
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-gray-500 text-[8px] font-bold uppercase tracking-widest">Focus vs Break Ratio</span>
+                    <span className="text-gray-400 text-[9px] font-bold tabular-nums">{focusPct}% / {breakPct}%</span>
+                  </div>
+                  <div className="flex h-2 rounded-full overflow-hidden bg-white/[0.03]">
+                    <div
+                      className="h-full rounded-l-full transition-all duration-700"
+                      style={{
+                        width: `${focusPct}%`,
+                        background: 'linear-gradient(to right, #FFB800, #FF8C00)',
+                        boxShadow: '0 0 8px rgba(255,184,0,0.25)',
+                      }}
+                    />
+                    <div
+                      className="h-full rounded-r-full transition-all duration-700"
+                      style={{
+                        width: `${breakPct}%`,
+                        background: 'linear-gradient(to right, #7C3AED, #8B5CF6)',
+                        boxShadow: '0 0 8px rgba(139,92,246,0.2)',
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#FFB800]" />
+                      <span className="text-gray-500 text-[8px] font-bold">Focus</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
+                      <span className="text-gray-500 text-[8px] font-bold">Break</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {totalFocusSeconds === 0 && totalBreakSeconds === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 bg-white/[0.015] rounded-2xl border border-white/[0.04]">
+                <div className="text-3xl mb-2">📊</div>
+                <span className="text-gray-500 text-xs font-semibold">No sessions for this period</span>
+                <span className="text-gray-600 text-[10px] mt-0.5">Start a focus session to see your stats</span>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
-                {/* Left column: Donut Chart & Legend */}
-                <div className="flex flex-col items-center justify-center bg-[#17181D]/30 border border-white/5 p-4 rounded-3xl min-h-[220px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                {/* Ring Chart — Apple Activity Rings Style */}
+                <div className="flex flex-col items-center justify-center bg-white/[0.015] border border-white/[0.04] p-4 rounded-2xl min-h-[200px]">
                   {(() => {
                     const chartItems = Object.values(focusByTag).filter(item => item.tag);
                     const totalChartSeconds = chartItems.reduce((acc, item) => acc + item.seconds, 0);
 
                     if (chartItems.length === 0) {
-                      return <div className="text-gray-500 text-xs text-center py-10 font-bold">No tagged focus sessions.</div>;
+                      return (
+                        <div className="flex flex-col items-center gap-2 py-4">
+                          <div className="text-2xl">🎯</div>
+                          <span className="text-gray-500 text-[10px] font-bold">No tagged sessions yet</span>
+                        </div>
+                      );
                     }
 
                     return (
                       <>
-                        {/* Legend without Untagged */}
-                        <div className="flex flex-wrap items-center justify-center gap-2 mb-4 max-h-[80px] overflow-y-auto">
-                          {chartItems.map((item, i) => (
-                            <div key={i} className="flex items-center gap-1.5 bg-[#1E2025]/50 px-2 py-0.5 rounded-full border border-white/5">
-                              <div className="w-2 h-2 rounded-full" style={{ background: item.tag.color }} />
-                              <span className="text-gray-300 text-[9px] font-extrabold">{item.tag.name}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Donut Chart */}
-                        <div className="relative flex items-center justify-center w-full my-1">
-                          <svg width="150" height="150" className="-rotate-90 drop-shadow-xl">
+                        {/* Ring Chart */}
+                        <div className="relative flex items-center justify-center w-full mb-3">
+                          <svg width="140" height="140" className="-rotate-90" style={{ filter: 'drop-shadow(0 0 12px rgba(255,184,0,0.15))' }}>
+                            {/* Background track */}
+                            <circle cx="70" cy="70" r="52" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="14" />
                             {(() => {
                               let currentOffset = 0;
-                              const circumference = 2 * Math.PI * 55;
+                              const circumference = 2 * Math.PI * 52;
+                              const gap = chartItems.length > 1 ? 4 : 0;
                               return chartItems.map((item, i) => {
                                 const proportion = item.seconds / totalChartSeconds;
-                                const dasharray = `${circumference * proportion} ${circumference}`;
-                                const dashoffset = -currentOffset;
+                                const segLen = circumference * proportion - gap;
+                                const dasharray = `${Math.max(0, segLen)} ${circumference}`;
+                                const dashoffset = -(currentOffset + (i > 0 ? gap / 2 : 0));
                                 currentOffset += circumference * proportion;
                                 return (
                                   <circle
                                     key={i}
-                                    cx="75"
-                                    cy="75"
-                                    r="55"
+                                    cx="70"
+                                    cy="70"
+                                    r="52"
                                     fill="none"
                                     stroke={item.tag.color}
-                                    strokeWidth="16"
+                                    strokeWidth="14"
                                     strokeDasharray={dasharray}
                                     strokeDashoffset={dashoffset}
-                                    strokeLinecap="butt"
-                                    className="transition-all duration-500"
+                                    strokeLinecap="round"
+                                    className="transition-all duration-700"
+                                    style={{ filter: `drop-shadow(0 0 6px ${item.tag.color}40)` }}
                                   />
                                 );
                               });
                             })()}
                           </svg>
                           <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-gray-500 text-[8px] font-extrabold uppercase tracking-wider">Tagged Focus</span>
-                            <span className="text-white font-black tracking-wide text-xs">
+                            <span className="text-white font-black text-lg tabular-nums tracking-tight">
                               {totalChartSeconds >= 3600 ? `${Math.floor(totalChartSeconds/3600)}h ${Math.floor((totalChartSeconds%3600)/60)}m` : 
                                totalChartSeconds >= 60 ? `${Math.floor(totalChartSeconds/60)}m` : 
                                `${totalChartSeconds}s`}
                             </span>
+                            <span className="text-gray-500 text-[8px] font-bold uppercase tracking-widest">Tagged</span>
                           </div>
+                        </div>
+
+                        {/* Legend pills */}
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 max-h-[60px] overflow-y-auto">
+                          {chartItems.map((item, i) => {
+                            const pct = Math.round((item.seconds / totalChartSeconds) * 100);
+                            return (
+                              <div key={i} className="flex items-center gap-1.5 bg-white/[0.04] px-2 py-1 rounded-lg border border-white/[0.04]">
+                                <div className="w-2 h-2 rounded-full shadow-sm" style={{ background: item.tag.color, boxShadow: `0 0 6px ${item.tag.color}50` }} />
+                                <span className="text-gray-300 text-[9px] font-bold">{item.tag.name}</span>
+                                <span className="text-gray-500 text-[8px] font-bold">{pct}%</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </>
                     );
                   })()}
                 </div>
 
-                {/* Right column: Bar Chart */}
-                <div className="flex flex-col bg-[#17181D]/30 border border-white/5 p-4 rounded-3xl justify-between min-h-[220px]">
-                  <span className="text-gray-400 text-[10px] font-extrabold mb-3 uppercase tracking-wider px-1">Activity Chart</span>
+                {/* Activity Chart — Gradient Bars */}
+                <div className="flex flex-col bg-white/[0.015] border border-white/[0.04] p-4 rounded-2xl justify-between min-h-[200px]">
+                  <span className="text-gray-400 text-[9px] font-bold mb-2 uppercase tracking-widest px-0.5">Activity</span>
                   
                   {(() => {
                     let buckets: { label: string; seconds: number }[] = [];
@@ -1122,6 +1315,10 @@ export const FocusClockPage: React.FC = () => {
                         const d = new Date(s.completedAt);
                         buckets[d.getHours()].seconds += s.elapsedSeconds;
                       });
+                      // Add active session to current hour
+                      if (includesToday && activeFocusSeconds > 0) {
+                        buckets[new Date().getHours()].seconds += activeFocusSeconds;
+                      }
                     } else if (statsPeriod === "week") {
                       buckets = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(l => ({ label: l, seconds: 0 }));
                       periodFocusHistory.forEach(s => {
@@ -1130,6 +1327,11 @@ export const FocusClockPage: React.FC = () => {
                         day = day === 0 ? 6 : day - 1;
                         buckets[day].seconds += s.elapsedSeconds;
                       });
+                      if (includesToday && activeFocusSeconds > 0) {
+                        let today = new Date().getDay();
+                        today = today === 0 ? 6 : today - 1;
+                        buckets[today].seconds += activeFocusSeconds;
+                      }
                     } else if (statsPeriod === "month") {
                       const daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
                       buckets = Array.from({length: daysInMonth}, (_, i) => ({ label: String(i + 1), seconds: 0 }));
@@ -1137,17 +1339,21 @@ export const FocusClockPage: React.FC = () => {
                         const d = new Date(s.completedAt);
                         buckets[d.getDate() - 1].seconds += s.elapsedSeconds;
                       });
+                      if (includesToday && activeFocusSeconds > 0) {
+                        buckets[new Date().getDate() - 1].seconds += activeFocusSeconds;
+                      }
                     } else if (statsPeriod === "year") {
                       buckets = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map(l => ({ label: l, seconds: 0 }));
                       periodFocusHistory.forEach(s => {
                         const d = new Date(s.completedAt);
                         buckets[d.getMonth()].seconds += s.elapsedSeconds;
                       });
+                      if (includesToday && activeFocusSeconds > 0) {
+                        buckets[new Date().getMonth()].seconds += activeFocusSeconds;
+                      }
                     }
                     
                     const maxSecondsInBuckets = Math.max(...buckets.map(b => b.seconds), 1);
-                    // Lock maximum scale to 1 hour (3600 seconds) if all focus sessions are under 1 hour.
-                    // If larger, round up to the nearest hour (multiple of 3600s).
                     let chartMaxSecs = 3600;
                     if (maxSecondsInBuckets > 3600) {
                       chartMaxSecs = Math.ceil(maxSecondsInBuckets / 3600) * 3600;
@@ -1155,10 +1361,9 @@ export const FocusClockPage: React.FC = () => {
                     const overallAvg = totalFocusSeconds / buckets.length;
  
                     return (
-                      <div className="w-full flex-1 flex flex-col relative px-2 pb-2">
-                        {/* Relative Bar & Gridline Container */}
-                        <div className="relative h-28 w-full flex items-end justify-between px-1 gap-0.5 border-b border-white/5 pb-1 z-10">
-                          {/* 1 Hour Horizontal Gridlines & Labels */}
+                      <div className="w-full flex-1 flex flex-col relative px-1 pb-1">
+                        <div className="relative h-28 w-full flex items-end justify-between px-0.5 gap-[1px] border-b border-white/[0.04] pb-1 z-10">
+                          {/* Gridlines */}
                           {[0.25, 0.5, 0.75].map((ratio) => {
                             const valSecs = chartMaxSecs * ratio;
                             const valLabel = valSecs >= 3600 
@@ -1167,10 +1372,10 @@ export const FocusClockPage: React.FC = () => {
                             return (
                               <div 
                                 key={ratio} 
-                                className="absolute left-0 right-0 border-t border-white/5 pointer-events-none flex items-center justify-end"
+                                className="absolute left-0 right-0 border-t border-white/[0.03] pointer-events-none flex items-center justify-end"
                                 style={{ bottom: `${ratio * 100}%` }}
                               >
-                                <span className="text-[7.5px] text-gray-600 font-extrabold bg-[#121316] px-1 -translate-y-1/2 z-20">
+                                <span className="text-[7px] text-gray-600/60 font-bold bg-[#0D0E12] px-1 -translate-y-1/2 z-20">
                                   {valLabel}
                                 </span>
                               </div>
@@ -1180,29 +1385,45 @@ export const FocusClockPage: React.FC = () => {
                           {/* Average Line */}
                           {overallAvg > 0 && (
                             <div 
-                              className="absolute left-0 right-0 border-t border-dashed border-[#FFB800]/40 flex items-center justify-end pointer-events-none z-10"
-                              style={{ bottom: `${(overallAvg / chartMaxSecs) * 100}%` }}
+                              className="absolute left-0 right-0 border-t border-dashed border-[#FFB800]/25 flex items-center justify-end pointer-events-none z-10"
+                              style={{ bottom: `${Math.min((overallAvg / chartMaxSecs) * 100, 100)}%` }}
                             >
-                              <span className="text-[#FFB800] text-[7.5px] font-extrabold bg-[#121316] pl-2 -translate-y-1/2 z-20">
-                                Avg: {overallAvg >= 3600 ? `${(overallAvg/3600).toFixed(1)}h` : `${Math.round(overallAvg/60)}m`}
+                              <span className="text-[#FFB800]/70 text-[7px] font-bold bg-[#0D0E12] pl-1.5 -translate-y-1/2 z-20">
+                                avg
                               </span>
                             </div>
                           )}
 
-                          {/* Bars Loop */}
+                          {/* Gradient Bars */}
                           {buckets.map((b, i) => {
                             const heightPct = (b.seconds / chartMaxSecs) * 100;
+                            const isCurrentBucket = includesToday && (
+                              (statsPeriod === "day" && i === new Date().getHours()) ||
+                              (statsPeriod === "week" && i === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1)) ||
+                              (statsPeriod === "month" && i === new Date().getDate() - 1) ||
+                              (statsPeriod === "year" && i === new Date().getMonth())
+                            );
                             return (
                               <div key={i} className="flex flex-col items-center flex-1 h-full justify-end group cursor-crosshair">
                                 <div 
-                                  className={`w-full max-w-[12px] bg-[#363A45] rounded-t-[3px] transition-all relative ${b.seconds > 0 ? 'group-hover:bg-[#FFB800]' : ''}`}
-                                  style={{ height: `${b.seconds > 0 ? Math.max(heightPct, 3) : 0}%` }}
+                                  className="w-full max-w-[10px] rounded-t-[3px] transition-all duration-300 relative"
+                                  style={{ 
+                                    height: `${b.seconds > 0 ? Math.max(heightPct, 3) : 0}%`,
+                                    background: b.seconds > 0 
+                                      ? isCurrentBucket && clk.status === "running"
+                                        ? `linear-gradient(to top, #10B981, #34D399)`
+                                        : `linear-gradient(to top, #2A2D38, #4A4E5C)`
+                                      : 'transparent',
+                                    boxShadow: isCurrentBucket && clk.status === "running" && b.seconds > 0
+                                      ? '0 0 8px rgba(16,185,129,0.3)' : 'none',
+                                  }}
                                 >
                                   {b.seconds > 0 && (
-                                    <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[8px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-30 transition-opacity font-extrabold shadow-md">
+                                    <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-[#1A1B22] text-white text-[7px] py-0.5 px-1.5 rounded-md opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-30 transition-opacity font-bold shadow-lg border border-white/5">
                                       {b.seconds >= 3600 
                                         ? `${(b.seconds/3600).toFixed(1).replace(/\.0$/, '')}h` 
-                                        : `${Math.floor(b.seconds/60)}m`}
+                                        : b.seconds >= 60 ? `${Math.floor(b.seconds/60)}m ${b.seconds%60}s`
+                                        : `${b.seconds}s`}
                                     </div>
                                   )}
                                 </div>
@@ -1211,12 +1432,12 @@ export const FocusClockPage: React.FC = () => {
                           })}
                         </div>
 
-                        {/* Labels row under the bar container */}
-                        <div className="flex justify-between px-1 mt-2 w-full">
+                        {/* Labels */}
+                        <div className="flex justify-between px-0.5 mt-1.5 w-full">
                           {buckets.map((b, i) => {
                             let showLabel = false;
                             if (statsPeriod === "day") {
-                              showLabel = i % 4 === 0 || i === 23;
+                              showLabel = i % 6 === 0 || i === 23;
                             } else if (statsPeriod === "week") {
                               showLabel = true;
                             } else if (statsPeriod === "month") {
@@ -1226,7 +1447,7 @@ export const FocusClockPage: React.FC = () => {
                             }
                             return (
                               <div key={i} className="flex-1 text-center">
-                                <span className="text-[7.5px] text-gray-500 font-extrabold">{showLabel ? b.label : ''}</span>
+                                <span className="text-[7px] text-gray-600 font-bold">{showLabel ? b.label : ''}</span>
                               </div>
                             );
                           })}
