@@ -120,33 +120,35 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
               'overflow-hidden',
               // Mobile: centered full-screen modal
               'left-3 right-3 bottom-3 top-3',
-              // Desktop: pinned above FAB, fixed width/height
-              'md:left-auto md:top-auto md:right-6 md:bottom-[112px]',
-              'md:w-[420px] md:h-[min(640px,calc(100vh-140px))]',
+              // Desktop: pinned bottom right, compact width, responsive vertical length
+              'md:left-auto md:top-auto md:right-5 md:bottom-5',
+              'md:w-[400px] md:h-[calc(100vh-40px)] md:max-h-[680px]',
             ].join(' ')}
           >
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 bg-[#0D213A]/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[var(--color-cyan)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#060a14]/95">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-[#00F0FF]/40 bg-[#0D213A] flex items-center justify-center p-0.5">
                 <img 
                   src="/bone-ai-avatar.png" 
                   alt="Bone AI" 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-cover rounded-full" 
                   onError={(e) => { (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=Bone+AI&background=0D213A&color=00F0FF'; }}
                 />
               </div>
               <div>
-                <h2 className="text-white font-bold text-sm tracking-wide">Bone AI</h2>
-                <p className="text-[#00F0FF] text-[10px] uppercase font-semibold tracking-widest">Your CosmicBone assistant</p>
+                <h2 className="text-white font-semibold text-xs tracking-wide flex items-center space-x-1.5">
+                  <span>Bone AI</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </h2>
               </div>
             </div>
             
-            <div className="flex items-center space-x-1.5 relative">
+            <div className="flex items-center space-x-0.5 relative">
               <button 
                 onClick={() => setView(view === 'chat' ? 'history' : 'chat')} 
-                className={`p-2 rounded-xl transition-colors ${view === 'history' ? 'bg-[#00F0FF]/15 text-[#00F0FF]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                className={`p-1.5 rounded-lg transition-colors ${view === 'history' ? 'bg-[#00F0FF]/15 text-[#00F0FF]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                 title="Chat History"
                 aria-label="Toggle history"
               >
@@ -154,7 +156,7 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
               </button>
               <button 
                 onClick={handleNewChat} 
-                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors" 
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors" 
                 title="New Chat"
                 aria-label="Start new chat"
               >
@@ -162,18 +164,18 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
               </button>
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors"
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
                 aria-label="More options"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
               <button 
                 onClick={onClose} 
-                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors" 
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors" 
                 title="Close"
                 aria-label="Close assistant"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
 
               {/* Action Dropdown Menu */}
