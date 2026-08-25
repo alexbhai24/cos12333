@@ -27,7 +27,8 @@ export const SearchModal: React.FC = () => {
     setActiveVideoModal,
     setActiveDocModal,
     setActiveBookModal,
-    setActiveTestModal
+    setActiveTestModal,
+    contentItems
   } = useApp();
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,20 +43,20 @@ export const SearchModal: React.FC = () => {
 
   const q = searchQuery.toLowerCase().trim();
 
-  const matchingVideos = MOCK_VIDEOS.filter(
-    v => !q || v.title.toLowerCase().includes(q) || v.subject.toLowerCase().includes(q)
+  const matchingVideos = contentItems.filter(
+    v => v.contentType === 'video' && (!q || v.title.toLowerCase().includes(q) || v.subject.toLowerCase().includes(q))
   );
 
-  const matchingDocs = MOCK_DOCUMENTS.filter(
-    d => !q || d.title.toLowerCase().includes(q) || d.subject.toLowerCase().includes(q)
+  const matchingDocs = contentItems.filter(
+    d => (d.contentType === 'document') && (!q || d.title.toLowerCase().includes(q) || d.subject.toLowerCase().includes(q))
   );
 
-  const matchingBooks = MOCK_BOOKS.filter(
-    b => !q || b.title.toLowerCase().includes(q) || (b.subject || '').toLowerCase().includes(q)
+  const matchingBooks = contentItems.filter(
+    b => b.contentType === 'book' && (!q || b.title.toLowerCase().includes(q) || (b.subject || '').toLowerCase().includes(q))
   );
 
-  const matchingTests = MOCK_TESTS.filter(
-    t => !q || t.title.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q)
+  const matchingTests = contentItems.filter(
+    t => t.contentType === 'test' && (!q || t.title.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q))
   );
 
   const hasResults = 
