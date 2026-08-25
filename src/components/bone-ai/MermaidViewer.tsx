@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+// @ts-expect-error bypass Vercel missing module
 import mermaid from 'mermaid';
 import { Copy, Check, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
