@@ -17,7 +17,6 @@ import { ProfileSettingsModal } from './components/modals/ProfileSettingsModal';
 import { CommentsModal } from './components/modals/CommentsModal';
 import { StreakDrawer } from './components/drawers/StreakDrawer';
 import { AppleShopDrawer } from './components/drawers/AppleShopDrawer';
-import { QrModal } from './components/modals/QrModal';
 import { AdminConsoleModal } from './components/modals/AdminConsoleModal';
 import { SavedItemsModal } from './components/modals/SavedItemsModal';
 import { Bell, Loader2 } from 'lucide-react';
@@ -55,8 +54,6 @@ const AppContent: React.FC = () => {
     setIsStreakDrawerOpen,
     isAppleShopOpen,
     setIsAppleShopOpen,
-    isQrModalOpen,
-    setIsQrModalOpen,
     isAdminConsoleOpen,
     setIsAdminConsoleOpen,
     setIsProfileSettingsOpen,
@@ -85,7 +82,6 @@ const AppContent: React.FC = () => {
         if (isSavedItemsOpen) { setIsSavedItemsOpen(false); return; }
         if (isStreakDrawerOpen) { setIsStreakDrawerOpen(false); return; }
         if (isAppleShopOpen) { setIsAppleShopOpen(false); return; }
-        if (isQrModalOpen) { setIsQrModalOpen(false); return; }
         if (isBoneAIOpen) { setIsBoneAIOpen(false); return; }
       }
       // Ctrl+K opens search
@@ -99,10 +95,10 @@ const AppContent: React.FC = () => {
   }, [
     activeVideoModal, activeDocModal, activeBookModal, activeTestModal,
     isProfileSettingsOpen, isAdminConsoleOpen, isSavedItemsOpen,
-    isStreakDrawerOpen, isAppleShopOpen, isQrModalOpen, isBoneAIOpen,
+    isStreakDrawerOpen, isAppleShopOpen, isBoneAIOpen,
     setActiveVideoModal, setActiveDocModal, setActiveBookModal, setActiveTestModal,
     setIsProfileSettingsOpen, setIsAdminConsoleOpen, setIsSavedItemsOpen,
-    setIsStreakDrawerOpen, setIsAppleShopOpen, setIsQrModalOpen, setIsBoneAIOpen,
+    setIsStreakDrawerOpen, setIsAppleShopOpen, setIsBoneAIOpen,
     setIsSearchOpen,
   ]);
 
@@ -111,14 +107,14 @@ const AppContent: React.FC = () => {
     const anyOpen = !!(
       activeVideoModal || activeDocModal || activeBookModal || activeTestModal ||
       isProfileSettingsOpen || isAdminConsoleOpen || isSavedItemsOpen ||
-      isStreakDrawerOpen || isAppleShopOpen || isQrModalOpen
+      isStreakDrawerOpen || isAppleShopOpen
     );
     document.body.classList.toggle('modal-open', anyOpen);
     return () => document.body.classList.remove('modal-open');
   }, [
     activeVideoModal, activeDocModal, activeBookModal, activeTestModal,
     isProfileSettingsOpen, isAdminConsoleOpen, isSavedItemsOpen,
-    isStreakDrawerOpen, isAppleShopOpen, isQrModalOpen,
+    isStreakDrawerOpen, isAppleShopOpen,
   ]);
 
   // 1. Firebase is resolving auth state — show the real app shell to make it feel instantly loaded
@@ -220,7 +216,6 @@ const AppContent: React.FC = () => {
       {isProfileSettingsOpen && <ProfileSettingsModal />}
       <StreakDrawer />
       <AppleShopDrawer />
-      <QrModal />
       <AdminConsoleModal />
 
       {/* Bone AI */}
