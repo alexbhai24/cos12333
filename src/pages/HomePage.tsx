@@ -20,6 +20,7 @@ import { HomeHero } from '../components/HomeHero';
 import { AppleTreeWidget } from '../components/AppleTreeWidget';
 import { FocusClockCard } from '../components/FocusClockCard';
 import { MusicPlayerWidget } from '../components/MusicPlayerWidget';
+import streak3d from '../assets/streak_3d.png';
 
 export const HomePage: React.FC = () => {
   const {
@@ -298,9 +299,13 @@ export const HomePage: React.FC = () => {
                     title="Click to view Cosmic Streak Society & Check-In 🔥"
                   >
                     <div className="text-[10px] text-[var(--text-muted)] group-hover:text-orange-300 font-semibold mb-0.5 transition-colors">Daily Streak</div>
-                    <div className={`text-lg font-black ${isStreakCompletedToday ? 'text-amber-400' : 'text-gray-400'} flex items-center justify-center gap-1 group-hover:scale-105 transition-transform`}>
-                      <Flame className={`w-4 h-4 ${isStreakCompletedToday ? 'text-orange-500 animate-pulse drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]' : 'text-gray-500 grayscale opacity-75'}`} />
-                      <span>{user?.streak || 0} Days</span>
+                    <div className="text-lg font-black text-white flex items-center justify-center gap-1 group-hover:scale-105 transition-transform">
+                      <img 
+                        src={streak3d} 
+                        className={`w-5 h-5 object-contain ${isStreakCompletedToday ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse' : 'grayscale opacity-60'}`} 
+                        alt="Streak" 
+                      />
+                      <span className="font-sans font-extrabold text-sm text-white pt-0.5">{user?.streak || 0} Days</span>
                     </div>
                   </button>
                 );
