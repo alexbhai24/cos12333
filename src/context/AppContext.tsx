@@ -225,9 +225,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userType,
       };
 
+      // Perform Duolingo Streak Auto-Freeze Protection on startup/load
+      const todayStr = getLocalDayString();
+      const history = mergedData.streakHistory || [];
+      const frozen = mergedData.frozenDates || [];
+      const activeAndFrozenDates = [...history, ...frozen].sort();
+
+      if (activeAndFrozenDates.length > 0) {
+        const lastDateStr = activeAndFrozenDates[activeAndFrozenDates.length - 1];
+        const diffDays = getDayDifference(lastDateStr, todayStr);
+
+        if (diffDays > 1) {
+          // Missed day(s) since last activity/freeze!
+          const missedDays = diffDays - 1;
+          let availableFreezes = mergedData.streakFreezes ?? 0;
+          let newFrozen = [...frozen];
+          let newFreezes = availableFreezes;
+
+          if (availableFreezes >= missedDays) {
+            // Protected by freeze
+            newFreezes -= missedDays;
+            for (let i = 1; i <= missedDays; i++) {
+              const [y, m, d] = lastDateStr.split('-').map(Number);
+              const missedDate = new Date(y, m - 1, d + i);
+              const frozenStr = getLocalDayString(missedDate);
+              if (!newFrozen.includes(frozenStr)) {
+                newFrozen.push(frozenStr);
+              }
+            }
+            mergedData.streakFreezes = newFreezes;
+            mergedData.frozenDates = newFrozen;
+            setTimeout(() => {
+              showNotification(`❄️ Streak protected! Auto-used ${missedDays} Streak Freeze${missedDays > 1 ? 's' : ''}!`);
+            }, 1000);
+          } else {
+            // No freezes -> streak breaks (resets to 0)
+            setTimeout(() => {
+              showNotification('💔 Streak reset to 0 days. Complete a task today to start a new streak!');
+            }, 1000);
+          }
+        }
+      }
+
+      // Calculate streak dynamically based on final updated history and frozen dates!
+      const calculatedStreak = calculateStreak(mergedData.streakHistory || [], mergedData.frozenDates || []);
+      const streakUpdated = calculatedStreak !== mergedData.streak;
+      mergedData.streak = calculatedStreak;
+
       const updated = profileService.saveProfile(mergedData);
       setUser(updated);
       setSelectedGradeState(normalizeGrade(updated.gradeLevel));
+
+      // Sync backend Firestore database if a discrepancy is found
+      if (streakUpdated && auth.currentUser) {
+        updateFirestoreProfile(auth.currentUser.uid, {
+          streak: calculatedStreak
+        }).catch(err => console.error('[AppContext] Failed to sync streak to Firestore:', err));
+      }
     }
   }, [currentUser, userRole, userProfile]);
 
@@ -250,64 +304,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const calculateStreak = (historyList: string[], frozenList: string[]): number => {
+    if (!historyList || historyList.length === 0) return 0;
+    
+    const todayStr = getLocalDayString();
+    const isVisitedOrFrozen = (dateStr: string) => historyList.includes(dateStr) || frozenList.includes(dateStr);
+    
+    // Check if today or yesterday is active/frozen. If neither, streak is 0.
+    if (!isVisitedOrFrozen(todayStr)) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = getLocalDayString(yesterday);
+      if (!isVisitedOrFrozen(yesterdayStr)) {
+        return 0;
+      }
+    }
+    
+    // Find the starting date for tracing backwards
+    let checkDate = new Date();
+    let checkDateStr = getLocalDayString(checkDate);
+    
+    // If today is not active/frozen, we start tracing from yesterday
+    if (!isVisitedOrFrozen(checkDateStr)) {
+      checkDate.setDate(checkDate.getDate() - 1);
+      checkDateStr = getLocalDayString(checkDate);
+    }
+    
+    let streakCount = 0;
+    const visitedSet = new Set(historyList);
+    const frozenSet = new Set(frozenList);
+    
+    while (true) {
+      if (visitedSet.has(checkDateStr) || frozenSet.has(checkDateStr)) {
+        streakCount++;
+      } else {
+        break; // chain broken
+      }
+      
+      checkDate.setDate(checkDate.getDate() - 1);
+      checkDateStr = getLocalDayString(checkDate);
+    }
+    
+    return streakCount;
+  };
+
   const claimDailyStreak = () => {
     if (!user || !user.email) return;
     const todayStr = getLocalDayString();
     const history = user.streakHistory || [];
+    const frozen = user.frozenDates || [];
 
     if (!history.includes(todayStr)) {
-      let currentStreak = user.streak || 0;
       let availableFreezes = user.streakFreezes || 0;
-      const frozen = user.frozenDates || [];
       let newFrozen = [...frozen];
       let newHistory = [...history, todayStr];
-      let streakSavedByFreeze = false;
-      let streakBroken = false;
-      let newStreak = currentStreak;
-
-      if (history.length > 0) {
-        const sortedHistory = [...history].sort();
-        const lastDateStr = sortedHistory[sortedHistory.length - 1];
-        const diffDays = getDayDifference(lastDateStr, todayStr);
-
-        if (diffDays === 1) {
-          // Consecutive calendar day -> advance streak!
-          newStreak = currentStreak + 1;
-        } else if (diffDays > 1) {
-          const missedDays = diffDays - 1;
-
-          if (availableFreezes >= missedDays) {
-            // Duolingo Freeze Protection: Automatically shield streak using equipped freezes
-            availableFreezes -= missedDays;
-            newStreak = currentStreak + 1;
-            streakSavedByFreeze = true;
-
-            for (let i = 1; i <= missedDays; i++) {
-              const [y, m, d] = lastDateStr.split('-').map(Number);
-              const missedDate = new Date(y, m - 1, d + i);
-              const frozenStr = getLocalDayString(missedDate);
-              if (!newFrozen.includes(frozenStr)) {
-                newFrozen.push(frozenStr);
-              }
-            }
-            showNotification(`❄️ Streak Freeze equipped! Protected your ${newStreak}-day streak!`);
-          } else {
-            // Broken streak
-            newStreak = 1;
-            newHistory = [todayStr];
-            streakBroken = true;
-            showNotification('Streak started anew for today! Keep learning daily 🔥');
-          }
-        } else {
-          newStreak = Math.max(currentStreak, 1);
-        }
-      } else {
-        newStreak = 1;
-      }
-
-      if (!streakBroken && !streakSavedByFreeze) {
-        showNotification(`🔥 Streak Active! You reached ${newStreak} Days!`);
-      }
+      
+      // Calculate the new streak count dynamically from the updated history and frozen dates!
+      const newStreak = calculateStreak(newHistory, newFrozen);
+      
+      showNotification(`🔥 Streak Active! You reached ${newStreak} Days!`);
 
       updateUserProfile({
         streak: newStreak,
