@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { AvatarDecoration } from './AvatarDecoration';
 import { TransparentImage } from './TransparentImage';
 import type { Theme, BackgroundType } from '../types';
+import streak3d from '../assets/streak_3d.png';
 
 import { teacherRequestService } from '../services/teacherRequestService';
 
@@ -182,11 +183,17 @@ export const TopBar: React.FC = () => {
             <button
               onClick={() => setIsStreakDrawerOpen(true)}
               type="button"
-              className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full transition-all active:scale-95 group focus:outline-none ${isStreakCompletedToday ? 'bg-[#1b120c]/90 hover:bg-[#28190e] border border-orange-500/30 shadow-[0_0_12px_rgba(249,115,22,0.15)]' : 'bg-gray-800/50 hover:bg-gray-800/80 border border-gray-600/30'}`}
+              className="flex items-center space-x-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full transition-all active:scale-95 group focus:outline-none bg-[#111322]/60 hover:bg-[#1b1e32]/80 border border-white/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
               title="Click to view Streak & Rewards"
             >
-              <span className={`text-sm sm:text-base leading-none select-none ${isStreakCompletedToday ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse' : 'grayscale opacity-75'}`}>🔥</span>
-              <span className={`${isStreakCompletedToday ? 'text-orange-400' : 'text-gray-400'} font-bold font-mono text-xs sm:text-sm`}>{user?.streak || 0}</span>
+              <img 
+                src={streak3d} 
+                className={`w-4 h-4 sm:w-5 sm:h-5 object-contain select-none transition-transform duration-200 group-hover:scale-110 ${isStreakCompletedToday ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse' : 'grayscale opacity-60'}`} 
+                alt="Streak" 
+              />
+              <span className="text-white font-extrabold font-sans text-xs sm:text-sm leading-none pt-0.5">
+                {user?.streak || 0}
+              </span>
             </button>
           );
         })()}
