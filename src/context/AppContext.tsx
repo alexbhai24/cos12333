@@ -84,8 +84,6 @@ interface AppContextType {
   setIsStreakDrawerOpen: (open: boolean) => void;
   isAppleShopOpen: boolean;
   setIsAppleShopOpen: (open: boolean) => void;
-  isQrModalOpen: boolean;
-  setIsQrModalOpen: (open: boolean) => void;
   isAdminConsoleOpen: boolean;
   setIsAdminConsoleOpen: (open: boolean) => void;
   changeUserRole: (email: string, newRole: string) => void;
@@ -149,7 +147,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isStreakDrawerOpen, setIsStreakDrawerOpen] = useState(false);
   const [isAppleShopOpen, setIsAppleShopOpen] = useState(false);
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
 
@@ -667,8 +664,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsStreakDrawerOpen,
         isAppleShopOpen,
         setIsAppleShopOpen,
-        isQrModalOpen,
-        setIsQrModalOpen,
         isAdminConsoleOpen,
         setIsAdminConsoleOpen,
         changeUserRole,
