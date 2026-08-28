@@ -57,7 +57,7 @@ export const Sidebar: React.FC = () => {
     { id: 'games', label: 'Bone Games', icon: Gamepad2 },
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
     { id: 'focus-clock', label: 'Focus Clock', icon: Timer },
-    { id: 'reading-room', label: 'Web Link', icon: Globe },
+    { id: 'link', label: 'Link', icon: Globe },
   ];
 
   const adminItems: NavItem[] = [
