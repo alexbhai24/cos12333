@@ -1,120 +1,182 @@
-/**
- * linkService — URL analysis and preview utilities for study material links.
- * Handles Google Drive sharing links, direct PDF/Office/image URLs.
- * No file upload logic here — users paste public links.
- */
+export interface LinkTool {
+  id: string;
+  label: string;
+  url: string;
+}
 
-export type PreviewType = 'googledrive' | 'pdf' | 'office' | 'image' | 'unknown';
+export interface LinkConfig {
+  mainUrl: string;
+  siteName: string;
+  tools: LinkTool[];
+}
 
-/** Extract Google Drive file ID from any Drive/Docs sharing URL */
-const getGoogleDriveId = (url: string): string | null => {
-  if (!url) return null;
-  // https://drive.google.com/file/d/FILE_ID/view?...
-  const m1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (m1) return m1[1];
-  // https://drive.google.com/open?id=FILE_ID
-  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  if (m2) return m2[1];
-  // https://docs.google.com/document/d/FILE_ID/...
-  const m3 = url.match(/docs\.google\.com\/[^/]+\/d\/([a-zA-Z0-9_-]+)/);
-  if (m3) return m3[1];
-  return null;
+export const DEFAULT_LINK_CONFIG: LinkConfig = {
+  mainUrl: 'https://wpmcheck.com/',
+  siteName: 'Link (wpmcheck.com)',
+  tools: [
+    { id: 't1', label: 'Speed Test', url: 'https://wpmcheck.com/' },
+    { id: 't2', label: 'Speed Test (Extended)', url: 'https://wpmcheck.com/reading-speed-test' },
+    { id: 't3', label: 'Time Calculator', url: 'https://wpmcheck.com/reading-time-calculator' },
+    { id: 't4', label: 'Speed Benchmarks', url: 'https://wpmcheck.com/reading-speed-benchmarks' },
+    { id: 't5', label: 'Readability Checker', url: 'https://wpmcheck.com/readability-checker' },
+    { id: 't6', label: 'Multi-Formula Analysis', url: 'https://wpmcheck.com/multi-formula-analysis' },
+    { id: 't7', label: 'Achievements', url: 'https://wpmcheck.com/achievements' },
+    { id: 't8', label: 'History', url: 'https://wpmcheck.com/history' },
+  ],
 };
 
+const STORAGE_KEY = 'cosmicbone_link_config';
+type Listener = (config: LinkConfig) => void;
+const listeners = new Set<Listener>();
+
+function loadConfig(): LinkConfig {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_LINK_CONFIG;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_LINK_CONFIG, ...parsed };
+  } catch {
+    return DEFAULT_LINK_CONFIG;
+  }
+}
+
+function saveConfig(config: LinkConfig) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  listeners.forEach((cb) => cb(config));
+}
+
+export type PreviewType =
+  | 'pdf'
+  | 'googledrive'
+  | 'gdrive'
+  | 'gdoc'
+  | 'office'
+  | 'image'
+  | 'video'
+  | 'website'
+  | 'embed'
+  | 'generic'
+  | 'other';
+
 export const linkService = {
-  /**
-   * Classify a URL so the preview modal can pick the right viewer.
-   * Detection is based on the URL itself (domain, extension).
-   */
-  getPreviewType: (url: string): PreviewType => {
-    if (!url) return 'unknown';
+  // ── Dynamic Embed Link Portal Config ──────────────────────────────────────
+  getConfig(): LinkConfig {
+    return loadConfig();
+  },
 
-    const clean = url.split('?')[0].toLowerCase();
+  updateConfig(partial: Partial<LinkConfig>): void {
+    const current = loadConfig();
+    const updated = { ...current, ...partial };
+    saveConfig(updated);
+  },
 
-    // Google Drive / Docs / Sheets / Slides
-    if (
-      url.includes('drive.google.com') ||
-      url.includes('docs.google.com') ||
-      url.includes('sheets.google.com') ||
-      url.includes('slides.google.com')
-    ) {
+  setMainUrl(url: string, siteName?: string): void {
+    const current = loadConfig();
+    const updated: LinkConfig = {
+      ...current,
+      mainUrl: url,
+      siteName: siteName || current.siteName,
+    };
+    saveConfig(updated);
+  },
+
+  subscribe(cb: Listener): () => void {
+    listeners.add(cb);
+    cb(loadConfig());
+    return () => listeners.delete(cb);
+  },
+
+  // ── Link Preview and URL Format Utilities ─────────────────────────────────
+  validateUrl(url: string): string {
+    if (!url || !url.trim()) return 'URL is required.';
+    try {
+      const parsed = new URL(url.trim());
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return 'URL must start with http:// or https://';
+      }
+      return '';
+    } catch {
+      return 'Please enter a valid URL (e.g., https://example.com)';
+    }
+  },
+
+  isGoogleDrive(url: string): boolean {
+    if (!url) return false;
+    return url.includes('drive.google.com') || url.includes('docs.google.com');
+  },
+
+  formatGoogleFormUrl(url: string): string {
+    if (!url) return '';
+    let trimmed = url.trim();
+    if (trimmed.includes('docs.google.com/forms')) {
+      if (!trimmed.includes('embedded=true')) {
+        trimmed += (trimmed.includes('?') ? '&' : '?') + 'embedded=true';
+      }
+    }
+    return trimmed;
+  },
+
+  getPreviewType(url: string): PreviewType {
+    if (!url) return 'generic';
+    const lower = url.toLowerCase();
+
+    if (lower.includes('drive.google.com') || lower.includes('docs.google.com')) {
       return 'googledrive';
     }
 
-    const ext = clean.split('.').pop() || '';
+    if (lower.endsWith('.pdf') || lower.includes('.pdf?')) {
+      return 'pdf';
+    }
 
-    if (ext === 'pdf') return 'pdf';
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return 'image';
-    if (['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls'].includes(ext)) return 'office';
+    if (lower.match(/\.(docx?|pptx?|xlsx?)($|\?)/) || lower.includes('onedrive') || lower.includes('sharepoint')) {
+      return 'office';
+    }
 
-    return 'unknown';
+    if (lower.match(/\.(jpeg|jpg|png|gif|webp|svg)($|\?)/)) {
+      return 'image';
+    }
+
+    if (lower.match(/\.(mp4|webm|ogg)($|\?)/) || lower.includes('youtube.com') || lower.includes('youtu.be')) {
+      return 'video';
+    }
+
+    return 'website';
   },
 
-  /**
-   * Convert any supported public link into an embeddable preview URL.
-   * - Google Drive → drive.google.com/file/d/{id}/preview
-   * - Direct PDF/image → original URL
-   * - Direct Office file → Microsoft Office Online viewer
-   * - Unknown → original URL (caller decides what to show)
-   */
-  getPreviewUrl: (url: string): string => {
+  getPreviewUrl(url: string): string {
     if (!url) return '';
+    const trimmed = url.trim();
 
-    const type = linkService.getPreviewType(url);
-
-    if (type === 'googledrive') {
-      const fileId = getGoogleDriveId(url);
-      if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`;
-      // Fallback: can't extract ID — let user open directly
-      return url;
-    }
-
-    if (type === 'office') {
-      return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
-    }
-
-    // pdf, image, unknown — use URL as-is
-    return url;
-  },
-
-  /** Returns true for Google Drive links */
-  isGoogleDrive: (url: string): boolean =>
-    url.includes('drive.google.com') || url.includes('docs.google.com'),
-
-  /** Basic URL validation: must be https */
-  validateUrl: (url: string): string | null => {
-    if (!url.trim()) return 'A file link is required.';
-    if (!url.startsWith('https://')) return 'Link must start with https://';
-    return null; // valid
-  },
-
-  /** Format Google Form URL into embedded view URL */
-  formatGoogleFormUrl: (raw: string): string => {
-    if (!raw) return '';
-    let url = raw.trim();
-
-    // If iframe tag, extract src
-    if (url.includes('<iframe') && url.includes('src=')) {
-      const srcMatch = url.match(/src=["']([^"']+)["']/i);
-      if (srcMatch && srcMatch[1]) {
-        url = srcMatch[1];
+    if (trimmed.includes('drive.google.com/file/d/')) {
+      const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://drive.google.com/file/d/${match[1]}/preview`;
       }
     }
 
-    // Replace /edit with /viewform
-    url = url.replace(/\/edit.*$/, '/viewform');
-
-    // Convert docs.google.com/forms links to embedded=true
-    if (url.includes('docs.google.com/forms')) {
-      if (url.includes('embedded=true')) {
-        return url;
+    if (trimmed.includes('docs.google.com/document/d/')) {
+      const match = trimmed.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://docs.google.com/document/d/${match[1]}/preview`;
       }
-      if (url.includes('?')) {
-        return `${url}&embedded=true`;
-      }
-      return `${url}?embedded=true`;
     }
 
-    return url;
+    if (trimmed.includes('docs.google.com/presentation/d/')) {
+      const match = trimmed.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://docs.google.com/presentation/d/${match[1]}/embed`;
+      }
+    }
+
+    if (trimmed.includes('docs.google.com/spreadsheets/d/')) {
+      const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://docs.google.com/spreadsheets/d/${match[1]}/preview`;
+      }
+    }
+
+    return trimmed;
   },
 };
+
+export default linkService;
