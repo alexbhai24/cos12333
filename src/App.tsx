@@ -36,6 +36,7 @@ import { GamesPage } from './pages/GamesPage';
 import { StudyRoomsPage } from './pages/StudyRoomsPage';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { FocusClockPage } from './pages/FocusClockPage';
+import { LinkPage } from './pages/LinkPage';
 import { FirestoreDashboardPage } from './pages/FirestoreDashboardPage';
 
 const AppContent: React.FC = () => {
@@ -152,21 +153,22 @@ const AppContent: React.FC = () => {
   // 5. Signed in + verified + setup complete → dashboard
   const renderRoute = () => {
     switch (currentRoute) {
-      case 'home':           return <HomePage />;
-      case 'videos':         return <VideosPage />;
-      case 'posts':          return <PostsPage />;
-      case 'study-rooms':    return <StudyRoomsPage />;
-      case 'documents':      return <DocumentsPage />;
-      case 'books':          return <BooksPage />;
-      case 'games':          return <GamesPage />;
+      case 'home': return <HomePage />;
+      case 'videos': return <VideosPage />;
+      case 'posts': return <PostsPage />;
+      case 'study-rooms': return <StudyRoomsPage />;
+      case 'documents': return <DocumentsPage />;
+      case 'books': return <BooksPage />;
+      case 'games': return <GamesPage />;
       case 'tests':
-      case 'test-series':    return <TestsPage />;
-      case 'portfolio':      return <PortfolioPage />;
-      case 'focus-clock':    return <FocusClockPage />;
+      case 'test-series': return <TestsPage />;
+      case 'portfolio': return <PortfolioPage />;
+      case 'focus-clock': return <FocusClockPage />;
+      case 'link': return <LinkPage />;
       case 'admin-dashboard':
       case 'admin-users':
         return userRole === 'admin' ? <FirestoreDashboardPage /> : <AccessDeniedPage />;
-      default:               return <HomePage />;
+      default: return <HomePage />;
     }
   };
 
@@ -193,9 +195,8 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main
-        className={`relative z-10 pt-20 pb-12 px-4 sm:px-8 transition-all duration-300 ${
-          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
-        }`}
+        className={`relative z-10 pt-20 pb-12 px-4 sm:px-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+          }`}
       >
         <div className="max-w-[1366px] mx-auto">
           {/* key triggers re-mount for smooth page transition */}
