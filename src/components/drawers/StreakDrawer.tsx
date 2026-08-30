@@ -109,12 +109,12 @@ export const StreakDrawer: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Immersive backdrop with light blur */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-0 transition-opacity" />
+      {/* Immersive backdrop without blur */}
+      <div className="absolute inset-0 bg-black/65 z-0 transition-opacity" />
       <div className="absolute inset-0 z-0 cursor-pointer" onClick={() => setIsStreakDrawerOpen(false)} />
 
-      {/* Premium Glassmorphic Modal with Increased Width */}
-      <div className="relative z-10 w-full max-w-[640px] bg-[#0b0e1b]/95 backdrop-blur-xl border border-white/10 rounded-[20px] shadow-[0_24px_50px_rgba(0,0,0,0.85)] p-6 overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-300 ease-out flex flex-col justify-between scrollbar-none">
+      {/* Premium Glassmorphic Modal */}
+      <div className="relative z-10 w-full max-w-[560px] bg-[#0b0e1b]/95 border border-white/10 rounded-[24px] shadow-[0_24px_50px_rgba(0,0,0,0.85)] p-5 overflow-y-auto max-h-[85vh] animate-in zoom-in-95 duration-300 ease-out flex flex-col justify-between scrollbar-none">
 
         {/* Dynamic Background Glows */}
         <div className="absolute -top-32 -left-32 w-64 h-64 bg-orange-600/10 rounded-full blur-[80px] pointer-events-none" />
