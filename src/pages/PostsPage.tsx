@@ -7,7 +7,7 @@ import {
   Bookmark,
   Plus,
   Sparkles,
-  Trash2
+  Send
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Post } from '../types';
@@ -21,9 +21,7 @@ export const PostsPage: React.FC = () => {
     savedItemIds,
     toggleSaveItem,
     showNotification,
-    openPublicProfile,
-    user,
-    deletePost
+    openPublicProfile
   } = useApp();
 
   const [activeFilter, setActiveFilter] = useState('All');
@@ -346,17 +344,6 @@ export const PostsPage: React.FC = () => {
                     >
                       <Share2 className="w-3.5 h-3.5" />
                     </button>
-
-                    {/* Delete (if author) */}
-                    {post.authorName === user.name && (
-                      <button
-                        onClick={() => deletePost(post.id)}
-                        className="p-2 rounded-xl border border-white/10 bg-white/5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
-                        title="Delete your post"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
                   </div>
                 </div>
 
