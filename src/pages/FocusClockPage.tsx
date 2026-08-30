@@ -508,7 +508,7 @@ export const FocusClockPage: React.FC = () => {
 
       {/* Phase transition banner (shown only when phase auto-completes, not on manual pause) */}
       {clk.mode === "pomodoro" && clk.awaitingPhaseStart && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/75 pointer-events-auto">
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/75 pointer-events-auto">
           <div className="flex flex-col items-center gap-6 p-8 bg-[#121316] rounded-[32px] border border-white/10 shadow-2xl max-w-xs w-full mx-4">
             <div className="text-5xl">{clk.phase === "break" ? "☕" : "🎯"}</div>
             <div className="flex flex-col items-center gap-2">
@@ -544,7 +544,7 @@ export const FocusClockPage: React.FC = () => {
 
       {/* All Done screen */}
       {clk.status === "complete" && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/80">
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80">
           <div className="flex flex-col items-center gap-6 p-8 bg-[#121316] rounded-[32px] border border-white/10 shadow-2xl max-w-xs w-full mx-4">
             <div className="text-6xl">🏆</div>
             <div className="flex flex-col items-center gap-2">
@@ -767,7 +767,7 @@ export const FocusClockPage: React.FC = () => {
       {showSettings && (
         <div 
           onClick={() => { setShowSettings(false); setEditingTagId(null); }}
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -892,7 +892,7 @@ export const FocusClockPage: React.FC = () => {
       {showColor && (
         <div 
           onClick={() => setShowColor(false)}
-          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -924,7 +924,7 @@ export const FocusClockPage: React.FC = () => {
       {showLoops && (
         <div 
           onClick={() => setShowLoops(false)}
-          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -950,7 +950,7 @@ export const FocusClockPage: React.FC = () => {
       {showBreak && (
         <div 
           onClick={() => setShowBreak(false)}
-          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -977,7 +977,7 @@ export const FocusClockPage: React.FC = () => {
       {showTagPicker && (
         <div 
           onClick={() => { setShowTagPicker(false); setIsEditingTags(false); }}
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -1118,7 +1118,7 @@ export const FocusClockPage: React.FC = () => {
       {showStats && (
         <div 
           onClick={() => { setShowStats(false); setStatsDateOffset(0); }}
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
