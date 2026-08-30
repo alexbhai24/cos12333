@@ -58,8 +58,14 @@ export const VideoModal: React.FC = () => {
     : 'Recently';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl bg-[#09182D]/95 border border-[rgba(0,240,255,0.25)] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div 
+      onClick={() => setActiveVideoModal(null)}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200 cursor-pointer"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-4xl bg-[#09182D]/95 border border-[rgba(0,240,255,0.25)] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] cursor-default"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#06101F]/80 border-b border-[rgba(0,240,255,0.15)]">
           <div>
@@ -143,9 +149,3 @@ export const VideoModal: React.FC = () => {
               {activeVideoModal.description ||
                 'Watch structured video lectures and academic notes curated for exam targets.'}
             </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
