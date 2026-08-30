@@ -1,11 +1,33 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { X, Maximize, ExternalLink, Calendar, User } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { extractYoutubeId } from '../../services/videoService';
 
 export const VideoModal: React.FC = () => {
-  const { activeVideoModal, setActiveVideoModal } = useApp();
+  const { activeVideoModal, setActiveVideoModal, claimDailyStreak, showNotification, videoWatchProgress, setVideoWatchProgress } = useApp();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [streakClaimed, setStreakClaimed] = useState(false);
+
+  useEffect(() => {
+    if (!activeVideoModal) {
+      setStreakClaimed(false);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setVideoWatchProgress(prev => {
+        const next = prev + 1;
+        if (next === 600 && !streakClaimed) {
+          claimDailyStreak();
+          showNotification("🎯 You watched 10 minutes of educational content! Streak secured! 🔥");
+          setStreakClaimed(true);
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeVideoModal, claimDailyStreak, showNotification, streakClaimed, setVideoWatchProgress]);
 
   if (!activeVideoModal) return null;
 
@@ -29,10 +51,10 @@ export const VideoModal: React.FC = () => {
   // Human-readable date helper
   const formattedDate = activeVideoModal.createdAt
     ? new Date(activeVideoModal.createdAt).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
     : 'Recently';
 
   return (
