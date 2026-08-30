@@ -110,7 +110,7 @@ export const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 pl-2.5 pr-4 sm:px-6 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 pl-2.5 pr-4 sm:px-6 flex items-center justify-between">
       {/* Left side: Logo & Mobile Toggle */}
       <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
         <button
@@ -184,7 +184,7 @@ export const TopBar: React.FC = () => {
             <button
               onClick={() => setIsStreakDrawerOpen(true)}
               type="button"
-              className="flex items-center space-x-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full transition-all active:scale-95 group focus:outline-none bg-[#111322]/60 hover:bg-[#1b1e32]/80 border border-white/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+              className="flex items-center space-x-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full transition-all active:scale-95 group focus:outline-none bg-[var(--bg-surface-solid)] hover:bg-[var(--bg-surface-secondary)] border border-[var(--border-color)] shadow-sm"
               title="Click to view Streak & Rewards"
             >
               <img 
@@ -192,7 +192,7 @@ export const TopBar: React.FC = () => {
                 className={`w-4 h-4 sm:w-5 sm:h-5 object-contain select-none transition-transform duration-200 group-hover:scale-110 ${isStreakCompletedToday ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse' : 'grayscale opacity-60'}`} 
                 alt="Streak" 
               />
-              <span className="text-white font-extrabold font-sans text-xs sm:text-sm leading-none pt-0.5">
+              <span className="text-[var(--text-primary)] font-extrabold font-sans text-xs sm:text-sm leading-none pt-0.5">
                 {user?.streak || 0}
               </span>
             </button>
@@ -202,13 +202,13 @@ export const TopBar: React.FC = () => {
         {/* Apples Button */}
         <button
           onClick={() => setIsAppleShopOpen(true)}
-          className="flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#0D213A]/90 hover:bg-[#132d4e] border border-[#37D996]/30 transition-all shadow-[0_0_12px_rgba(55,217,150,0.15)] active:scale-95 group"
+          className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-[var(--bg-surface-solid)] hover:bg-[var(--bg-surface-secondary)] border border-[var(--border-color)] transition-all shadow-sm active:scale-95 group"
           title="Click to view Apple Shop & Donations"
         >
           <span className="text-sm sm:text-base leading-none select-none drop-shadow-[0_0_6px_rgba(74,222,128,0.4)]">
             {(user?.apples || 0) > 100 ? '🍎' : '🍏'}
           </span>
-          <span className="text-[#37D996] font-bold font-mono text-xs sm:text-sm">{user?.apples || 0}</span>
+          <span className="text-[var(--color-success)] font-bold font-mono text-xs sm:text-sm">{user?.apples || 0}</span>
         </button>
 
         {/* User Profile Button */}
