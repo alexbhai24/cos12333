@@ -89,33 +89,55 @@ interface AppContextType {
   changeUserRole: (email: string, newRole: string) => void;
   isSavedItemsOpen: boolean;
   setIsSavedItemsOpen: (open: boolean) => void;
+  videoWatchProgress: number;
+  setVideoWatchProgress: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRoute, setCurrentRouteState] = useState<PageRoute>(() => {
-    const hash = window.location.hash.replace('#', '') as PageRoute;
-    if (hash) return hash;
-    return (localStorage.getItem('cosmicbone_current_route') as PageRoute) || 'home';
+    // 1. Check if there's a legacy hash URL
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+      const cleanHash = hash.split('?')[0] as PageRoute;
+      return cleanHash;
+    }
+    // 2. Otherwise use path
+    const path = window.location.pathname.substring(1).split('?')[0] as PageRoute;
+    if (path) return path;
+    return 'home';
   });
 
   const setCurrentRoute = (route: PageRoute) => {
     setCurrentRouteState(route);
-    localStorage.setItem('cosmicbone_current_route', route);
-    window.location.hash = route;
+    const path = route === 'home' ? '/' : `/${route}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path + window.location.search);
+    }
   };
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '') as PageRoute;
-      if (hash && hash !== currentRoute) {
-        setCurrentRouteState(hash);
-        localStorage.setItem('cosmicbone_current_route', hash);
+    // Clean up URL if we loaded via hash or if pathname is wrong
+    const hash = window.location.hash.substring(1);
+    const path = currentRoute === 'home' ? '/' : `/${currentRoute}`;
+    if (hash || window.location.pathname !== path) {
+      window.history.replaceState(null, '', path + window.location.search);
+    }
+
+    const handlePopState = () => {
+      // Re-evaluate on back/forward buttons
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        setCurrentRouteState(hash.split('?')[0] as PageRoute);
+        return;
       }
+      const path = window.location.pathname.substring(1).split('?')[0] as PageRoute;
+      setCurrentRouteState(path || 'home');
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [currentRoute]);
 
   const [theme, setThemeState] = useState<Theme>(() => {
@@ -149,6 +171,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAppleShopOpen, setIsAppleShopOpen] = useState(false);
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
+  const [videoWatchProgress, setVideoWatchProgress] = useState(0);
 
   const [activeVideoModal, setActiveVideoModal] = useState<ContentItem | null>(null);
   const [activeDocModal, setActiveDocModal] = useState<ContentItem | null>(null);
@@ -195,6 +218,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync Firebase Auth user + Firestore userProfile into local UserProfile state
   useEffect(() => {
+    if (authLoading) return;
+    if (currentUser && !userProfile) return; // Wait for Firestore profile to load
+
     if (currentUser) {
       const email = currentUser.email?.toLowerCase().trim();
       const isFixedAdmin = email === 'rajanandalex1@gmail.com';
@@ -306,10 +332,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const calculateStreak = (historyList: string[], frozenList: string[]): number => {
     if (!historyList || historyList.length === 0) return 0;
-    
+
     const todayStr = getLocalDayString();
     const isVisitedOrFrozen = (dateStr: string) => historyList.includes(dateStr) || frozenList.includes(dateStr);
-    
+
     // Check if today or yesterday is active/frozen. If neither, streak is 0.
     if (!isVisitedOrFrozen(todayStr)) {
       const yesterday = new Date();
@@ -319,32 +345,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return 0;
       }
     }
-    
+
     // Find the starting date for tracing backwards
     let checkDate = new Date();
     let checkDateStr = getLocalDayString(checkDate);
-    
+
     // If today is not active/frozen, we start tracing from yesterday
     if (!isVisitedOrFrozen(checkDateStr)) {
       checkDate.setDate(checkDate.getDate() - 1);
       checkDateStr = getLocalDayString(checkDate);
     }
-    
+
     let streakCount = 0;
     const visitedSet = new Set(historyList);
     const frozenSet = new Set(frozenList);
-    
+
     while (true) {
       if (visitedSet.has(checkDateStr) || frozenSet.has(checkDateStr)) {
         streakCount++;
       } else {
         break; // chain broken
       }
-      
+
       checkDate.setDate(checkDate.getDate() - 1);
       checkDateStr = getLocalDayString(checkDate);
     }
-    
+
     return streakCount;
   };
 
@@ -358,10 +384,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let availableFreezes = user.streakFreezes || 0;
       let newFrozen = [...frozen];
       let newHistory = [...history, todayStr];
-      
+
       // Calculate the new streak count dynamically from the updated history and frozen dates!
       const newStreak = calculateStreak(newHistory, newFrozen);
-      
+
       showNotification(`🔥 Streak Active! You reached ${newStreak} Days!`);
 
       updateUserProfile({
@@ -596,7 +622,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'theme-sky',
       'theme-rose-pink',
       'theme-dark-black',
-      'theme-purple-white'
+      'theme-purple-white',
+      'theme-white'
     );
     document.documentElement.classList.add(`theme-${theme}`);
   }, [theme]);
@@ -623,7 +650,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const raw = localStorage.getItem('cosmicbone_completed_tests');
       if (raw) storedCompleted = JSON.parse(raw);
-    } catch (e) {}
+    } catch (e) { }
 
     const alreadyCompleted =
       Boolean(testId && user.completedTestIds && user.completedTestIds.includes(testId)) ||
@@ -641,7 +668,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       localStorage.setItem('cosmicbone_completed_tests', JSON.stringify(updatedCompleted));
-    } catch (e) {}
+    } catch (e) { }
 
     updateUserProfile({
       apples: (user.apples || 0) + rewardAmount,
@@ -724,6 +751,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         changeUserRole,
         isSavedItemsOpen,
         setIsSavedItemsOpen,
+        videoWatchProgress,
+        setVideoWatchProgress,
       }}
     >
       {children}
