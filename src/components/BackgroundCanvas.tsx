@@ -16,7 +16,7 @@ export const BackgroundCanvas: React.FC = () => {
   const src = BG_MAP[background] ?? BG_MAP['lighthouse'];
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none bg-[var(--bg-app)]" style={{ transition: 'background-color 0.5s ease' }}>
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none bg-[var(--bg-app)] no-theme-override" style={{ transition: 'background-color 0.5s ease' }}>
       {/* Full-bleed background image - object-cover stretches to fill */}
       <img
         key={src}
