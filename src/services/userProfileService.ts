@@ -41,11 +41,22 @@ export async function ensureProfile(): Promise<UserProfileDoc> {
 
   // 2. Check localStorage fallback if offline
   const storedKey = `cosmicbone_profile_${user.uid}`;
-  const stored = localStorage.getItem(storedKey);
+  const oldKey = `cosmicbone_profile_${user.email?.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  
+  const stored = localStorage.getItem(storedKey) || localStorage.getItem(oldKey);
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
       if (isFixedAdmin) parsed.role = 'admin';
+      
+      // If we found the old key but no Firestore doc, let's push this data to Firestore!
+      try {
+        const mergedProfile = { ...parsed, uid: user.uid, email: user.email };
+        await setDoc(doc(db, 'users', user.uid), mergedProfile, { merge: true });
+      } catch (err) {
+        console.warn('Failed to upload migrated profile to Firestore', err);
+      }
+      
       return parsed;
     } catch (e) {}
   }
