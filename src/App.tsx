@@ -37,6 +37,7 @@ import { StudyRoomsPage } from './pages/StudyRoomsPage';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { FocusClockPage } from './pages/FocusClockPage';
 import { LinkPage } from './pages/LinkPage';
+import { ToolsPage } from './pages/ToolsPage';
 import { FirestoreDashboardPage } from './pages/FirestoreDashboardPage';
 
 const AppContent: React.FC = () => {
@@ -45,6 +46,7 @@ const AppContent: React.FC = () => {
     sidebarCollapsed,
     notificationMessage,
     user,
+    updateUserProfile,
     isProfileSettingsOpen,
     isBoneAIOpen,
     setIsBoneAIOpen,
@@ -165,6 +167,8 @@ const AppContent: React.FC = () => {
       case 'portfolio': return <PortfolioPage />;
       case 'focus-clock': return <FocusClockPage />;
       case 'link': return <LinkPage />;
+      case 'tools':
+      case 'reading-room': return <ToolsPage />;
       case 'admin-dashboard':
       case 'admin-users':
         return userRole === 'admin' ? <FirestoreDashboardPage /> : <AccessDeniedPage />;
@@ -243,3 +247,4 @@ export function App() {
 }
 
 export default App;
+
