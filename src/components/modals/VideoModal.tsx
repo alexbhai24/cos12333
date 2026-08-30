@@ -149,3 +149,9 @@ export const VideoModal: React.FC = () => {
               {activeVideoModal.description ||
                 'Watch structured video lectures and academic notes curated for exam targets.'}
             </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
