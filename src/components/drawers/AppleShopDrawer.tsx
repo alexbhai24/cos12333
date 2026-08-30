@@ -111,7 +111,7 @@ export const AppleShopDrawer: React.FC = () => {
       <div className="absolute inset-0 z-0 cursor-pointer" onClick={() => setIsAppleShopOpen(false)} />
 
       {/* Modal Body - Premium Glassmorphic Sheet */}
-      <div className="relative z-10 w-full max-w-[440px] bg-[#0c0f1e]/95 backdrop-blur-xl border border-white/10 rounded-[20px] shadow-[0_24px_50px_rgba(0,0,0,0.8)] p-6 overflow-y-auto max-h-[85vh] animate-in zoom-in-95 duration-200 flex flex-col justify-between scrollbar-none">
+      <div className="relative z-10 w-full max-w-[440px] bg-[#0c0f1e]/95 border border-white/10 rounded-[20px] shadow-[0_24px_50px_rgba(0,0,0,0.8)] p-6 overflow-y-auto max-h-[85vh] animate-in zoom-in-95 duration-200 flex flex-col justify-between scrollbar-none">
 
         {/* Subtle Decorative Glows */}
         <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-[#37D996]/10 blur-[80px] pointer-events-none" />
