@@ -33,7 +33,8 @@ export type Theme =
   | 'beaches'
   | 'rose-pink'
   | 'dark-black'
-  | 'purple-white';
+  | 'purple-white'
+  | 'white';
 
 export type BackgroundType =
   | 'lighthouse'
@@ -62,6 +63,8 @@ export type PageRoute =
   | 'saved-videos'
   | 'focus-clock'
   | 'link'
+  | 'tools'
+  | 'reading-room'
   | 'admin-dashboard'
   | 'admin-users'
   | 'teacher-console';
