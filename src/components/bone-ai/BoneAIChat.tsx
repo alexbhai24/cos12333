@@ -511,41 +511,42 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#080e1a]/95 backdrop-blur-md rounded-b-3xl">
+    <div className="flex flex-col h-full bg-transparent">
       {/* Messages Feed */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 scrollbar-premium">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-premium">
         {/* Date Divider (Copilot-Style) */}
-        <div className="flex items-center justify-center my-2">
-          <div className="h-[1px] bg-white/5 flex-1"></div>
-          <span className="px-3 text-[10px] text-gray-400 font-medium tracking-wider uppercase">Today</span>
-          <div className="h-[1px] bg-white/5 flex-1"></div>
+        <div className="flex items-center justify-center mb-3">
+          <div className="h-px bg-white/[0.06] flex-1"></div>
+          <span className="px-3 text-[10px] text-gray-500 font-medium tracking-wider">Today</span>
+          <div className="h-px bg-white/[0.06] flex-1"></div>
         </div>
 
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-4 py-8 space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00F0FF]/20 to-[#8B5CF6]/20 border border-white/10 flex items-center justify-center text-[#00F0FF] shadow-lg">
-              <Sparkles className="w-6 h-6 animate-pulse" />
+          <div className="h-full flex flex-col items-center justify-center text-center px-4 py-8 space-y-5">
+            {/* Avatar Icon */}
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 via-violet-600/20 to-cyan-500/10 border border-white/10 flex items-center justify-center shadow-lg">
+              <Sparkles className="w-6 h-6 text-cyan-400" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-white tracking-wide">How can I help you today?</h3>
-              <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+            <div className="space-y-1.5">
+              <h3 className="text-[15px] font-bold text-white tracking-tight">How can I help you today?</h3>
+              <p className="text-[12px] text-gray-400 max-w-[240px] leading-relaxed">
                 Ask about JEE, NEET, solve problems, analyze diagrams, or explore concepts.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-2 w-full max-w-xs mt-3">
+            <div className="grid grid-cols-1 gap-1.5 w-full mt-1">
               {[
                 'Explain Newton’s laws of motion',
                 'What is the structure of DNA?',
                 'Who is the father of biotechnology?',
                 'Help me solve a calculus problem'
               ].map(prompt => (
-                <button 
+                <button
                   key={prompt}
                   onClick={() => handleSend(prompt)}
-                  className="w-full px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-[#00F0FF]/30 rounded-xl text-xs text-left text-gray-300 hover:text-white transition-all flex items-center justify-between group"
+                  className="w-full px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] hover:border-white/[0.14] rounded-2xl text-[12px] text-left text-gray-300 hover:text-white transition-all flex items-center justify-between group"
                 >
-                  <span className="truncate">{prompt}</span>
-                  <span className="text-gray-500 group-hover:text-[#00F0FF] text-[10px]">↗</span>
+                  <span>{prompt}</span>
+                  <span className="text-gray-600 group-hover:text-gray-300 text-[10px] shrink-0 ml-2">↗</span>
                 </button>
               ))}
             </div>
@@ -554,9 +555,9 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
           messages.map(msg => (
             <div key={msg.id} className="space-y-1">
               {msg.role === 'user' ? (
-                /* User Message (Right-aligned sleek pill) */
+                /* User Message — Copilot right-aligned bubble */
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] bg-[#131d33] border border-white/10 text-white rounded-2xl px-4 py-2.5 shadow-sm">
+                  <div className="max-w-[82%] bg-[#1e2535] border border-white/[0.08] text-white rounded-[20px] rounded-tr-md px-4 py-3 shadow-sm">
                     {msg.image && (
                       <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
                         <img src={msg.image} alt="Upload" className="max-h-40 w-auto object-contain" />
@@ -568,14 +569,14 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
                         <span className="truncate max-w-[180px]">{(msg as any).filename}</span>
                       </div>
                     )}
-                    <p className="text-xs text-gray-100 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    <p className="text-[12px] text-gray-100 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   </div>
                 </div>
               ) : (
-                /* Assistant Message (Copilot-Style Left presentation) */
+                /* Assistant Message — Copilot style left-aligned */
                 <div className="flex justify-start">
                   <div className="w-full space-y-2 py-1">
-                    <div className="text-xs text-gray-200 leading-relaxed select-text space-y-1">
+                    <div className="text-[12px] text-gray-200 leading-relaxed select-text space-y-1">
                       {renderFormattedText(msg.content)}
                     </div>
 
@@ -653,16 +654,16 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Copilot-Style Modern Capsule Input Box */}
-      <div className="p-3 border-t border-white/5 bg-[#050a14] rounded-b-3xl">
-        {/* Attachment preview float */}
+      {/* Input Bar */}
+      <div className="p-3 border-t border-white/[0.06] shrink-0">
+        {/* Attachment preview */}
         <AnimatePresence>
           {attachment && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mb-2 p-2 bg-[#0D213A] border border-white/10 rounded-2xl shadow-xl flex items-center justify-between"
+              exit={{ opacity: 0, y: 8 }}
+              className="mb-2 p-2.5 bg-white/[0.04] border border-white/[0.08] rounded-2xl flex items-center justify-between"
             >
               <div className="flex items-center space-x-2 min-w-0">
                 {attachment.type === 'image' ? (
@@ -687,17 +688,17 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
           )}
         </AnimatePresence>
 
-        {/* Outer Capsule Container */}
-        <div className="bg-[#0e1626] border border-white/10 rounded-2xl p-2.5 focus-within:border-[#00F0FF]/40 shadow-inner transition-all">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
+        {/* Input Capsule */}
+        <div className="bg-[#1a1e2a] border border-white/[0.08] rounded-[22px] p-3 focus-within:border-white/[0.16] transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
             accept="image/jpeg, image/png, image/webp, application/pdf"
-            className="hidden" 
+            className="hidden"
           />
 
-          {/* Top Textarea */}
+          {/* Textarea */}
           <textarea
             ref={textareaRef}
             value={inputText}
@@ -709,30 +710,29 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
               }
             }}
             placeholder="Message Bone AI or ask a question..."
-            className="w-full bg-transparent border-0 text-white text-xs placeholder:text-gray-500 focus:outline-none resize-none min-h-[36px] max-h-24 px-1"
+            className="w-full bg-transparent border-0 text-white text-[13px] placeholder:text-gray-500 focus:outline-none resize-none min-h-[36px] max-h-28 px-0 leading-relaxed"
             rows={1}
           />
 
-          {/* Bottom Action Bar */}
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-            {/* Left Controls: Plus icon + Mode pill */}
-            <div className="flex items-center space-x-1.5">
-              {/* + Attachment Button */}
-              <button 
+          {/* Action Bar */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/[0.06]">
+            {/* Left: + and Mode */}
+            <div className="flex items-center space-x-1">
+              <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors border border-white/5"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all border border-white/[0.08]"
                 title="Attach Image or PDF"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
 
-              {/* Mode Selector Pill */}
+              {/* Mode Pill */}
               <div className="relative">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsModeOpen(!isModeOpen)}
-                  className="flex items-center space-x-1 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-[11px] font-medium text-gray-300 border border-white/5 transition-colors"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.10] rounded-full text-[12px] font-medium text-gray-300 border border-white/[0.08] transition-all"
                 >
                   <span>{mode}</span>
                   <ChevronDown className="w-3 h-3 text-gray-400" />
@@ -746,7 +746,7 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 5 }}
-                        className="absolute bottom-full left-0 mb-2 w-52 bg-[#0c1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-20 p-1.5 space-y-1"
+                        className="absolute bottom-full left-0 mb-2 w-56 bg-[#1c2030] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-20 p-1.5 space-y-0.5"
                       >
                         {MODES.map(m => {
                           const Icon = m.icon;
@@ -775,27 +775,27 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({ messages, onAddMessage, 
               </div>
             </div>
 
-            {/* Right Controls: Mic + Send */}
+            {/* Right: Mic + Send */}
             <div className="flex items-center space-x-1.5">
-              <button 
+              <button
                 type="button"
                 onClick={toggleVoiceInput}
-                className={`p-1.5 rounded-lg transition-all ${
-                  isListening 
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                  isListening
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.08]'
                 }`}
-                title={isListening ? "Listening... (Click to stop)" : "Speech to text"}
+                title={isListening ? 'Listening… click to stop' : 'Voice input'}
               >
                 {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
               </button>
 
-              <button 
+              <button
                 type="button"
                 onClick={() => handleSend()}
                 disabled={isGenerating || (!inputText.trim() && !attachment)}
-                className="p-1.5 bg-[#00F0FF] hover:bg-[#38bdf8] text-[#040812] rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md"
-                title="Send Message"
+                className="w-8 h-8 rounded-full bg-[#00D4E8] hover:bg-[#00F0FF] text-[#0a0c14] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_2px_12px_rgba(0,240,255,0.3)]"
+                title="Send"
               >
                 {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               </button>
