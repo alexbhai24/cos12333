@@ -689,3 +689,153 @@ body.focus-idle .fixed.bottom-4.right-4 {
   pointer-events: none;
   transition: opacity 0.7s ease;
 }
+
+/* Theme 7: White - Clean bright theme */
+.theme-white {
+  --bg-app: #F9FAFB;
+  --bg-sidebar: #FFFFFF;
+  --bg-surface: rgba(255, 255, 255, 0.85);
+  --bg-surface-solid: #FFFFFF;
+  --bg-surface-secondary: #F3F4F6;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-color-hover: rgba(0, 0, 0, 0.2);
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #6B7280;
+  --color-primary: #3B82F6;
+  --color-cyan: #06B6D4;
+  --color-violet: #8B5CF6;
+  --glow-primary: rgba(59, 130, 246, 0.15);
+}
+
+
+/* Force override for hardcoded text colors in white theme */
+.theme-white .text-white, .theme-white .text-gray-100, .theme-white .text-gray-200 { color: #111827 !important; }
+.theme-white .text-gray-300 { color: #374151 !important; }
+.theme-white .text-gray-400 { color: #4B5563 !important; }
+.theme-white .text-gray-500 { color: #6B7280 !important; }
+.theme-white .text-\[\#030816\] { color: #F3F4F6 !important; }
+.theme-white ::placeholder { color: #6B7280 !important; opacity: 1 !important; }
+.theme-white input, .theme-white textarea { color: #111827 !important; }
+
+/* GLOBAL BACKGROUND OVERRIDES FOR ALL THEMES */
+/* Replaces all hardcoded arbitrary dark hex backgrounds with the active theme's surface variable */
+.bg-\[\#060919\], .bg-\[\#090C22\], .bg-\[\#121316\],
+.bg-\[\#040716\], .bg-\[\#040612\], .bg-\[\#09182D\],
+.bg-\[\#17181D\], .bg-\[\#0D152D\], .bg-\[\#1E2025\],
+.bg-\[\#111111\], .bg-\[\#0d1117\], .bg-\[\#040812\],
+.bg-\[\#0C1427\], .bg-\[\#0D0E12\], .bg-\[\#111322\],
+.bg-\[\#09152B\], .bg-\[\#1A1B22\], .bg-\[\#0b0e1b\],
+.bg-\[\#2D3039\], .bg-\[\#0D213A\], .bg-\[\#04140E\],
+.bg-\[\#180922\], .bg-\[\#000000\], .bg-\[\#1A0713\],
+.bg-\[\#060913\], .bg-\[\#111827\], .bg-\[\#132d4e\],
+.bg-\[\#120826\], .bg-\[\#0A1428\],
+.bg-\[\#090C22\]\/90, .bg-\[\#090C22\]\/95, .bg-\[\#111322\]\/95,
+.bg-\[\#0D0E12\]\/95, .bg-\[\#060918\]\/95, .bg-\[\#070B19\]\/95,
+.bg-\[\#090C22\]\/80, .bg-\[\#090C22\]\/85, .bg-\[\#121316\]\/80,
+.bg-\[\#0B0F29\]\/80, .bg-\[\#1b1e32\]\/80, .bg-\[\#0A0F2E\]\/60,
+.bg-\[\#17181D\]\/60, .bg-\[\#090C22\]\/60, .bg-\[\#090C22\]\/50,
+.bg-\[\#030510\]\/50, .bg-\[\#0c0f1e\]\/95, .bg-\[\#050716\]\/30,
+.bg-\[\#040612\]\/40, .bg-\[\#09182D\]\/95, .bg-\[\#06101F\]\/80,
+.bg-\[\#090C22\]\/98 {
+  background-color: var(--bg-surface) !important;
+}
+
+/* Force dark gradients to use theme surface */
+.from-\[\#06101F\], .via-\[\#09182D\], .to-\[\#0A1428\] {
+  background: var(--bg-surface) !important;
+}
+
+
+/* ============================================================
+   BONE AI — always stays dark regardless of active theme.
+   Higher specificity (.theme-white .no-theme-override .xxx)
+   beats the base white-theme overrides (.theme-white .xxx).
+   ============================================================ */
+
+/* Text colors: restore original white/gray values */
+.theme-white .no-theme-override .text-white,
+.theme-white .no-theme-override .text-gray-100,
+.theme-white .no-theme-override .text-gray-200 { color: #ffffff !important; }
+.theme-white .no-theme-override .text-gray-300 { color: #D1D5DB !important; }
+.theme-white .no-theme-override .text-gray-400 { color: #9CA3AF !important; }
+.theme-white .no-theme-override .text-gray-500 { color: #6B7280 !important; }
+
+/* Placeholder and inputs */
+.theme-white .no-theme-override ::placeholder { color: #6B7280 !important; opacity: 1 !important; }
+.theme-white .no-theme-override input,
+.theme-white .no-theme-override textarea { color: #ffffff !important; }
+
+/* Backgrounds that white-theme overrides: restore originals */
+.theme-white .no-theme-override .bg-white\/5  { background-color: rgba(255,255,255,0.05) !important; }
+.theme-white .no-theme-override .bg-white\/10 { background-color: rgba(255,255,255,0.10) !important; }
+.theme-white .no-theme-override .bg-white\/\[0\.04\] { background-color: rgba(255,255,255,0.04) !important; }
+.theme-white .no-theme-override .bg-white\/\[0\.06\] { background-color: rgba(255,255,255,0.06) !important; }
+.theme-white .no-theme-override .bg-white\/\[0\.08\] { background-color: rgba(255,255,255,0.08) !important; }
+.theme-white .no-theme-override .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.03) !important; }
+.theme-white .no-theme-override .bg-white\/\[0\.07\] { background-color: rgba(255,255,255,0.07) !important; }
+.theme-white .no-theme-override .bg-\[\#090C22\]   { background-color: #090C22 !important; }
+.theme-white .no-theme-override .bg-\[\#0D213A\]   { background-color: #0D213A !important; }
+.theme-white .no-theme-override .bg-\[\#1c2030\]   { background-color: #1c2030 !important; }
+.theme-white .no-theme-override .bg-\[\#1e2535\]   { background-color: #1e2535 !important; }
+.theme-white .no-theme-override .bg-\[\#1a1e2a\]   { background-color: #1a1e2a !important; }
+.theme-white .no-theme-override .bg-\[\#0a0c14\]\/90 { background-color: rgba(10,12,20,0.90) !important; }
+
+/* Borders */
+.theme-white .no-theme-override .border-white\/5  { border-color: rgba(255,255,255,0.05) !important; }
+.theme-white .no-theme-override .border-white\/10 { border-color: rgba(255,255,255,0.10) !important; }
+.theme-white .no-theme-override .border-white\/\[0\.06\] { border-color: rgba(255,255,255,0.06) !important; }
+.theme-white .no-theme-override .border-white\/\[0\.08\] { border-color: rgba(255,255,255,0.08) !important; }
+
+
+/* ============================================================
+   FOCUS CLOCK — force dark-black theme when white is active.
+   Using #id selector gives specificity (1,1,0) which beats
+   class-only white-theme rules (0,2,0).
+   ============================================================ */
+
+/* Force white text throughout focus clock */
+.theme-white #focus-clock-container { color: #ffffff; }
+.theme-white #focus-clock-container .text-white,
+.theme-white #focus-clock-container .text-gray-100,
+.theme-white #focus-clock-container .text-gray-200 { color: #ffffff !important; }
+.theme-white #focus-clock-container .text-gray-300 { color: #D1D5DB !important; }
+.theme-white #focus-clock-container .text-gray-400 { color: #9CA3AF !important; }
+.theme-white #focus-clock-container .text-gray-500 { color: #6B7280 !important; }
+
+/* Restore dark backgrounds in focus clock panels */
+.theme-white #focus-clock-container .bg-white\/5  { background-color: rgba(255,255,255,0.05) !important; }
+.theme-white #focus-clock-container .bg-white\/10 { background-color: rgba(255,255,255,0.10) !important; }
+.theme-white #focus-clock-container .bg-black\/50 { background-color: rgba(0,0,0,0.50) !important; }
+.theme-white #focus-clock-container .bg-black\/80 { background-color: rgba(0,0,0,0.80) !important; }
+.theme-white #focus-clock-container .bg-\[\#090C22\]    { background-color: #090C22 !important; }
+.theme-white #focus-clock-container .bg-\[\#121316\]    { background-color: #121316 !important; }
+.theme-white #focus-clock-container .bg-\[\#17181D\]    { background-color: #17181D !important; }
+.theme-white #focus-clock-container .bg-\[\#1E2025\]    { background-color: #1E2025 !important; }
+.theme-white #focus-clock-container .bg-\[\#040716\]    { background-color: #040716 !important; }
+.theme-white #focus-clock-container .bg-\[\#060919\]    { background-color: #060919 !important; }
+.theme-white #focus-clock-container .bg-\[\#111111\]    { background-color: #111111 !important; }
+.theme-white #focus-clock-container .bg-\[\#0D0E12\]    { background-color: #0D0E12 !important; }
+.theme-white #focus-clock-container .bg-\[\#090C22\]\/50 { background-color: rgba(9,12,34,0.50) !important; }
+.theme-white #focus-clock-container .bg-\[\#090C22\]\/90 { background-color: rgba(9,12,34,0.90) !important; }
+.theme-white #focus-clock-container .border-white\/5  { border-color: rgba(255,255,255,0.05) !important; }
+.theme-white #focus-clock-container .border-white\/10 { border-color: rgba(255,255,255,0.10) !important; }
+.theme-white #focus-clock-container ::placeholder { color: #6B7280 !important; }
+.theme-white #focus-clock-container input,
+.theme-white #focus-clock-container textarea { color: #ffffff !important; }
+
+
+
+/* White theme: make background image clearly visible.
+   - mix-blend-lighten is invisible on white; use multiply instead.
+   - Raise opacity so the photo shows through clearly. */
+.theme-white .no-theme-override > img {
+  opacity: 0.55 !important;
+  mix-blend-mode: multiply !important;
+}
+
+/* Also soften the dark gradient overlay so it does not grey-wash the white background */
+.theme-white .no-theme-override > div[style*="gradient"] {
+  opacity: 0.3 !important;
+}
+
