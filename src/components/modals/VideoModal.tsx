@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { extractYoutubeId } from '../../services/videoService';
 
 export const VideoModal: React.FC = () => {
-  const { activeVideoModal, setActiveVideoModal, claimDailyStreak, showNotification, videoWatchProgress, setVideoWatchProgress } = useApp();
+  const { activeVideoModal, setActiveVideoModal, claimDailyStreak, showNotification, setVideoWatchProgress } = useApp();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [streakClaimed, setStreakClaimed] = useState(false);
 
@@ -48,7 +48,6 @@ export const VideoModal: React.FC = () => {
     }
   };
 
-  // Human-readable date helper
   const formattedDate = activeVideoModal.createdAt
     ? new Date(activeVideoModal.createdAt).toLocaleDateString(undefined, {
       year: 'numeric',
