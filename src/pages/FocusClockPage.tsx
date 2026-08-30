@@ -481,7 +481,7 @@ export const FocusClockPage: React.FC = () => {
     <div 
       id="focus-clock-container" 
       data-fullscreen={isFullscreen}
-      className="flex flex-col items-center justify-between min-h-screen lg:min-h-[calc(100vh-140px)] w-full p-6 bg-transparent text-white relative overflow-hidden data-[fullscreen=true]:bg-black data-[fullscreen=true]:z-50"
+      className="flex flex-col items-center justify-between min-h-screen lg:min-h-[calc(100vh-140px)] w-full p-6 bg-transparent text-white relative overflow-hidden data-[fullscreen=true]:bg-black data-[fullscreen=true]:z-50 no-theme-override"
     >
       
       {/* Top Right Controls (Fullscreen and Focus/Loop indicator) */}
@@ -508,7 +508,7 @@ export const FocusClockPage: React.FC = () => {
 
       {/* Phase transition banner (shown only when phase auto-completes, not on manual pause) */}
       {clk.mode === "pomodoro" && clk.awaitingPhaseStart && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm pointer-events-auto">
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/75 pointer-events-auto">
           <div className="flex flex-col items-center gap-6 p-8 bg-[#121316] rounded-[32px] border border-white/10 shadow-2xl max-w-xs w-full mx-4">
             <div className="text-5xl">{clk.phase === "break" ? "☕" : "🎯"}</div>
             <div className="flex flex-col items-center gap-2">
@@ -544,7 +544,7 @@ export const FocusClockPage: React.FC = () => {
 
       {/* All Done screen */}
       {clk.status === "complete" && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/80">
           <div className="flex flex-col items-center gap-6 p-8 bg-[#121316] rounded-[32px] border border-white/10 shadow-2xl max-w-xs w-full mx-4">
             <div className="text-6xl">🏆</div>
             <div className="flex flex-col items-center gap-2">
@@ -765,8 +765,14 @@ export const FocusClockPage: React.FC = () => {
           SETTINGS POP OVER DIALOG (100% Mockup Match)
           ──────────────────────────────────────────────────────── */}
       {showSettings && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-transparent p-4 pointer-events-none">
-          <div className="bg-[#121316] border border-white/5 rounded-[32px] w-full max-w-sm p-6 space-y-5 shadow-2xl pointer-events-auto">
+        <div 
+          onClick={() => { setShowSettings(false); setEditingTagId(null); }}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121316] border border-white/5 rounded-[32px] w-full max-w-sm p-6 space-y-5 shadow-2xl pointer-events-auto cursor-default"
+          >
             {/* Mode selection capsule */}
             <div className="flex justify-center bg-[#1E2025] p-1 rounded-2xl">
               {(["pomodoro", "stopwatch"] as const).map((m) => (
@@ -884,8 +890,14 @@ export const FocusClockPage: React.FC = () => {
 
       {/* Nested custom picker modal */}
       {showColor && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-transparent p-4 pointer-events-none">
-          <div className="bg-[#121316] border border-white/5 rounded-3xl w-full max-w-xs p-5 space-y-4 shadow-2xl pointer-events-auto">
+        <div 
+          onClick={() => setShowColor(false)}
+          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121316] border border-white/5 rounded-3xl w-full max-w-xs p-5 space-y-4 shadow-2xl pointer-events-auto cursor-default"
+          >
             <span className="text-xs font-bold text-gray-400">Select accent color</span>
             <div className="flex flex-wrap gap-2 justify-center">
               {PRESET_COLORS.map((c) => (
@@ -910,8 +922,14 @@ export const FocusClockPage: React.FC = () => {
 
       {/* Loops picker */}
       {showLoops && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-transparent p-4 pointer-events-none">
-          <div className="bg-[#121316] border border-white/5 rounded-3xl w-full max-w-xs p-5 space-y-4 text-center shadow-2xl pointer-events-auto">
+        <div 
+          onClick={() => setShowLoops(false)}
+          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121316] border border-white/5 rounded-3xl w-full max-w-xs p-5 space-y-4 text-center shadow-2xl pointer-events-auto cursor-default"
+          >
             <span className="text-xs font-bold text-gray-400">Loops count</span>
             <div className="flex flex-col gap-1 py-2 max-h-40 overflow-y-auto">
               {[{ label: "Infinite", value: -1 }, { label: "1 time", value: 1 }, { label: "2 times", value: 2 }, { label: "3 times", value: 3 }].map((opt) => (
@@ -930,8 +948,14 @@ export const FocusClockPage: React.FC = () => {
 
       {/* Break picker */}
       {showBreak && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-transparent p-4 pointer-events-none">
-          <div className="bg-[#121316] border border-white/5 rounded-3xl w-full max-w-xs p-5 space-y-4 text-center shadow-2xl pointer-events-auto">
+        <div 
+          onClick={() => setShowBreak(false)}
+          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121316] border border-white/5 rounded-3xl w-full max-w-xs p-5 space-y-4 text-center shadow-2xl pointer-events-auto cursor-default"
+          >
             <span className="text-xs font-bold text-gray-400">Break duration</span>
             <div className="flex flex-col gap-1 py-2 max-h-40 overflow-y-auto">
               {[0, 3, 5, 10, 15, 20, 30, 45, 60].map((minsOpt) => (
@@ -951,8 +975,14 @@ export const FocusClockPage: React.FC = () => {
 
       {/* Tag Selector */}
       {showTagPicker && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-transparent p-4 pointer-events-none">
-          <div className="bg-[#121316] border border-white/5 rounded-[32px] w-full max-w-sm p-6 pb-8 shadow-2xl pointer-events-auto">
+        <div 
+          onClick={() => { setShowTagPicker(false); setIsEditingTags(false); }}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121316] border border-white/5 rounded-[32px] w-full max-w-sm p-6 pb-8 shadow-2xl pointer-events-auto cursor-default"
+          >
             <div className="flex items-center justify-between mb-4">
               <span className="text-xl font-bold text-white">Select Tag</span>
               <div className="flex items-center gap-4">
@@ -965,8 +995,9 @@ export const FocusClockPage: React.FC = () => {
                 <button 
                   onClick={() => setShowTagPicker(false)} 
                   className="text-gray-400 hover:text-white transition-colors"
+                  title="Close"
                 >
-                  <MoreHorizontal className="w-5 h-5" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -1085,8 +1116,14 @@ export const FocusClockPage: React.FC = () => {
           STATISTICS MODAL — Premium Apple-Style Design
           ──────────────────────────────────────────────────────── */}
       {showStats && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 pointer-events-auto">
-          <div className="bg-[#0D0E12]/95 backdrop-blur-2xl border border-white/[0.06] rounded-[28px] w-full max-w-2xl p-5 space-y-3.5 max-h-[90vh] overflow-y-auto scrollbar-thin shadow-[0_32px_80px_rgba(0,0,0,0.8)] pointer-events-auto">
+        <div 
+          onClick={() => { setShowStats(false); setStatsDateOffset(0); }}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 pointer-events-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0D0E12] border border-white/[0.08] rounded-[28px] w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-none shadow-[0_32px_80px_rgba(0,0,0,0.85)] pointer-events-auto cursor-default"
+          >
             
             {/* Header */}
             <div className="flex items-center justify-between">
