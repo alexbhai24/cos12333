@@ -37,25 +37,10 @@ export const FlipPanel: React.FC<FlipPanelProps> = ({
             "shadow-2xl overflow-hidden transition-all duration-300"
           )}
           style={{
-            boxShadow: `0 35px 60px -15px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255,255,255,0.075), inset 0 -2px 10px rgba(0,0,0,0.5), 0 0 100px ${accentColor}25`,
+            boxShadow: `0 35px 60px -15px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255,255,255,0.075), inset 0 -2px 10px rgba(0,0,0,0.5)`,
             border: '1px solid rgba(255,255,255,0.025)'
           }}
         >
-          {/* Luxurious top highlight reflection (50% brightness) */}
-          <div 
-            className="absolute top-0 left-0 right-0 h-[40%] pointer-events-none rounded-t-[1.5rem] sm:rounded-t-[2.5rem] lg:rounded-t-[3rem]"
-            style={{ 
-              background: `linear-gradient(to bottom, rgba(255,255,255,0.4), transparent)`,
-              opacity: topReflectionOpacity 
-            }}
-          />
-
-          {/* Subtle accent glow at the bottom inside the panel */}
-          <div 
-            className="absolute bottom-0 left-0 right-0 h-[60%] opacity-[0.2] pointer-events-none"
-            style={{ background: `linear-gradient(to top, ${accentColor}, transparent)` }}
-          />
-          
           <span 
             className="text-white font-bold tracking-tighter z-10"
             style={{
@@ -78,25 +63,10 @@ export const FlipPanel: React.FC<FlipPanelProps> = ({
           "shadow-2xl overflow-hidden transition-all duration-300"
         )}
         style={{
-          boxShadow: `0 35px 60px -15px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255,255,255,0.075), inset 0 -2px 10px rgba(0,0,0,0.5), 0 0 100px ${accentColor}25`,
+          boxShadow: `0 35px 60px -15px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255,255,255,0.075), inset 0 -2px 10px rgba(0,0,0,0.5)`,
           border: '1px solid rgba(255,255,255,0.025)'
         }}
       >
-        {/* Luxurious top highlight reflection (50% brightness) */}
-        <div 
-          className="absolute top-0 left-0 right-0 h-[40%] pointer-events-none rounded-t-[1.5rem] sm:rounded-t-[2.5rem] lg:rounded-t-[3rem]"
-          style={{ 
-            background: `linear-gradient(to bottom, rgba(255,255,255,0.4), transparent)`,
-            opacity: topReflectionOpacity 
-          }}
-        />
-
-        {/* Subtle accent glow at the bottom inside the panel */}
-        <div 
-          className="absolute bottom-0 left-0 right-0 h-[60%] opacity-[0.2] pointer-events-none"
-          style={{ background: `linear-gradient(to top, ${accentColor}, transparent)` }}
-        />
-        
         <span 
           className="text-white font-bold tracking-tighter z-10"
           style={{
@@ -118,25 +88,10 @@ export const FlipPanel: React.FC<FlipPanelProps> = ({
           "shadow-2xl overflow-hidden transition-all duration-300"
         )}
         style={{
-          boxShadow: `0 35px 60px -15px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255,255,255,0.075), inset 0 -2px 10px rgba(0,0,0,0.5), 0 0 100px ${accentColor}25`,
+          boxShadow: `0 35px 60px -15px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255,255,255,0.075), inset 0 -2px 10px rgba(0,0,0,0.5)`,
           border: '1px solid rgba(255,255,255,0.025)'
         }}
       >
-        {/* Luxurious top highlight reflection (50% brightness) */}
-        <div 
-          className="absolute top-0 left-0 right-0 h-[40%] pointer-events-none rounded-t-[1.5rem] sm:rounded-t-[2.5rem] lg:rounded-t-[3rem]"
-          style={{ 
-            background: `linear-gradient(to bottom, rgba(255,255,255,0.4), transparent)`,
-            opacity: topReflectionOpacity 
-          }}
-        />
-
-        {/* Subtle accent glow at the bottom inside the panel */}
-        <div 
-          className="absolute bottom-0 left-0 right-0 h-[60%] opacity-[0.2] pointer-events-none"
-          style={{ background: `linear-gradient(to top, ${accentColor}, transparent)` }}
-        />
-        
         <span 
           className="text-white font-bold tracking-tighter z-10"
           style={{
