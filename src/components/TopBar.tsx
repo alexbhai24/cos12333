@@ -75,7 +75,8 @@ export const TopBar: React.FC = () => {
     { id: 'beaches', label: 'Beaches', desc: 'Sunset orange/deep violet with gold accent', preview: 'bg-[#180922] border-[#F59E0B]' },
     { id: 'rose-pink', label: 'Rose Pink', desc: 'Rose & neon magenta pink theme', preview: 'bg-[#1A0713] border-[#FF69B4]' },
     { id: 'dark-black', label: 'Dark Black', desc: 'Pure OLED black with white highlights', preview: 'bg-[#000000] border-[#FFFFFF]' },
-    { id: 'purple-white', label: 'Purple White', desc: 'Royal purple with crisp white contrast', preview: 'bg-[#120826] border-[#C084FC]' }
+    { id: 'purple-white', label: 'Purple White', desc: 'Royal purple with crisp white contrast', preview: 'bg-[#120826] border-[#C084FC]' },
+    { id: 'white', label: 'Clean White', desc: 'Bright, clean white theme with dark text', preview: 'bg-[#FFFFFF] border-[#D1D5DB]' }
   ];
 
   const bgSequence: BackgroundType[] = [
