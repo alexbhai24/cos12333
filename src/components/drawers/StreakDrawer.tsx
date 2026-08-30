@@ -19,7 +19,7 @@ import freeze3d from '../../assets/freeze_3d.png';
 import streak3d from '../../assets/streak_3d.png';
 
 export const StreakDrawer: React.FC = () => {
-  const { user, buyStreakFreeze, isStreakDrawerOpen, setIsStreakDrawerOpen, showNotification } = useApp();
+  const { user, buyStreakFreeze, isStreakDrawerOpen, setIsStreakDrawerOpen, showNotification, videoWatchProgress } = useApp();
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [reminderActive, setReminderActive] = useState(() => localStorage.getItem('cosmicbone_streak_reminder') === 'true');
 
@@ -30,9 +30,6 @@ export const StreakDrawer: React.FC = () => {
     showNotification(nextState ? '🔔 Daily reminder set for 8:00 PM!' : '🔕 Daily reminder disabled.');
   };
 
-  const handleUseFreeze = () => {
-    showNotification('❄️ Freezes are applied automatically on days you miss logging in to protect your streak!');
-  };
 
   // Reset calendar to current month and lock body scroll when drawer opens
   useEffect(() => {
@@ -74,6 +71,38 @@ export const StreakDrawer: React.FC = () => {
 
   // Milestone logic
   const currentStreak = user.streak || 0;
+
+  // -- Dynamic Calculations --
+  const history = user.streakHistory || [];
+  
+  // Consistency (This Month)
+  const now = new Date();
+  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const daysInMonthSoFar = now.getDate();
+  const activeDaysThisMonth = history.filter(d => d.startsWith(currentMonthPrefix)).length;
+  const consistencyPercent = Math.min(100, Math.round((activeDaysThisMonth / daysInMonthSoFar) * 100)) || 0;
+
+  // Longest Streak
+  let longestStreak = 0;
+  if (history.length > 0) {
+    const sortedDates = [...history].sort();
+    let currentLen = 1;
+    longestStreak = 1;
+    for (let i = 1; i < sortedDates.length; i++) {
+       const d1 = new Date(sortedDates[i-1]);
+       const d2 = new Date(sortedDates[i]);
+       const diffTime = Math.abs(d2.getTime() - d1.getTime());
+       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+       if (diffDays === 1) {
+          currentLen++;
+          longestStreak = Math.max(longestStreak, currentLen);
+       } else if (diffDays > 1) {
+          currentLen = 1;
+       }
+    }
+  }
+  longestStreak = Math.max(longestStreak, currentStreak);
+
   const nextMilestone = Math.ceil((currentStreak + 1) / 10) * 10;
   const progressPercent = Math.min(100, Math.round((currentStreak / nextMilestone) * 100));
   const daysNeeded = nextMilestone - currentStreak;
@@ -112,7 +141,7 @@ export const StreakDrawer: React.FC = () => {
 
           {/* Two-column streak section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
+
             {/* Left Card: Current Streak */}
             <div className="relative overflow-hidden rounded-2xl p-5 border border-white/[0.06] bg-[#111322]/60 shadow-xl flex flex-col justify-between h-[230px]">
               {/* Flame overlay glow */}
@@ -123,7 +152,7 @@ export const StreakDrawer: React.FC = () => {
                   <span className="text-[9px] font-black text-orange-400 uppercase tracking-wider flex items-center gap-1">
                     <span className="text-xs">🔥</span> CURRENT STREAK
                   </span>
-                  
+
                   <div className="flex items-baseline space-x-2 mt-1">
                     <span className="text-5xl font-black text-white leading-none tracking-tight">
                       {currentStreak}
@@ -133,10 +162,6 @@ export const StreakDrawer: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="inline-flex items-center space-x-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full text-[9px] font-extrabold mt-3 select-none">
-                    <span>👑</span>
-                    <span>Longest Streak: 12 days</span>
-                  </div>
                 </div>
 
                 <div className="relative flex-shrink-0 mt-1 mr-1">
@@ -146,28 +171,30 @@ export const StreakDrawer: React.FC = () => {
 
               {/* Progress and Motivation */}
               <div className="space-y-2.5 pt-4 border-t border-white/5">
-                <div className="flex justify-between items-center text-[10px] font-bold text-gray-400">
-                  <span>Progress to {nextMilestone} Days</span>
-                  <span className="text-orange-400 font-mono">{progressPercent}%</span>
+                <div className="flex justify-between items-end mb-1">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Daily Streak Goal</span>
+                    <span className="text-xs font-bold text-white">Watch 10 min of video</span>
+                  </div>
+                  <span className="text-xs font-black text-[#00F0FF]">
+                    {Math.min(100, Math.floor((videoWatchProgress / 600) * 100))}%
+                  </span>
                 </div>
-                <div className="w-full h-2.5 bg-black rounded-full overflow-hidden border border-white/5 p-0.5">
-                  <div 
-                    className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400 rounded-full transition-all duration-1000"
-                    style={{ width: `${progressPercent}%` }}
-                  />
+
+                <div className="w-full h-2.5 bg-black rounded-full overflow-hidden border border-white/5 relative p-0.5 shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-600 to-[#00F0FF] rounded-full transition-all duration-1000 ease-linear shadow-[0_0_10px_rgba(0,240,255,0.5)]"
+                    style={{ width: `${Math.min(100, (videoWatchProgress / 600) * 100)}%` }}
+                  >
+                    <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                  </div>
                 </div>
-                <p className="text-[9px] text-gray-400">
-                  {daysNeeded > 0 
-                    ? `${daysNeeded} more day${daysNeeded > 1 ? 's' : ''} to unlock Streak Master badge! 🏆`
-                    : 'Streak Master badge unlocked! 🏆'
-                  }
-                </p>
               </div>
             </div>
 
             {/* Right Column: Streak Protection & Bonus */}
             <div className="flex flex-col gap-3 justify-between h-[230px]">
-              
+
               {/* Streak Protection */}
               <div className="bg-[#111322]/60 border border-white/[0.06] rounded-2xl p-4 flex flex-row items-center justify-between flex-1 relative overflow-hidden">
                 <div className="space-y-1.5 flex-1 pr-2">
@@ -175,18 +202,12 @@ export const StreakDrawer: React.FC = () => {
                     <span className="text-xs">❄️</span> STREAK FREEZES
                   </span>
                   <div className="text-base font-black text-white flex items-baseline gap-1">
-                    <span className="text-cyan-400 font-sans text-xl">{user.streakFreezes || 0}</span> 
+                    <span className="text-cyan-400 font-sans text-xl">{user.streakFreezes || 0}</span>
                     <span className="text-xs text-gray-300 font-bold">Available</span>
                   </div>
                   <p className="text-[9px] text-gray-400 leading-snug">Freeze your streak when life gets in the way.</p>
-                  
+
                   <div className="flex gap-2 pt-1.5">
-                    <button
-                      onClick={handleUseFreeze}
-                      className="py-1.5 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-lg text-[9px] font-black transition-all duration-200 active:scale-95 cursor-pointer uppercase tracking-wider"
-                    >
-                      Use Freeze
-                    </button>
                     <button
                       onClick={buyStreakFreeze}
                       className="py-1.5 px-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg text-[9px] font-black transition-all duration-200 active:scale-95 cursor-pointer flex items-center gap-0.5"
@@ -226,7 +247,7 @@ export const StreakDrawer: React.FC = () => {
 
           {/* Calendar and Sidebar grid row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
+
             {/* Advanced Calendar Engine (UNTOUCHED CALENDAR) */}
             <div className="md:col-span-2 bg-[#111322]/60 border border-white/[0.06] rounded-2xl p-4 shadow-xl">
               <div className="flex items-center justify-between mb-4 border-b border-white/[0.03] pb-3">
@@ -282,8 +303,8 @@ export const StreakDrawer: React.FC = () => {
                       <div
                         key={`day-${day}`}
                         className={`w-7 h-7 flex items-center justify-center mx-auto rounded-full transition-all ${isToday
-                            ? 'border border-gray-600 text-white bg-white/5'
-                            : 'text-gray-600 hover:text-gray-400'
+                          ? 'border border-gray-600 text-white bg-white/5'
+                          : 'text-gray-600 hover:text-gray-400'
                           }`}
                       >
                         {day}
@@ -305,12 +326,12 @@ export const StreakDrawer: React.FC = () => {
                     <div key={`day-${day}`} className="h-7 w-full flex items-center justify-center relative group">
                       <div
                         className={`flex items-center justify-center text-white ${prevVisited && nextVisited
-                            ? 'w-full h-7 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500'
-                            : prevVisited
-                              ? 'w-full h-7 bg-gradient-to-r from-orange-500 to-amber-500 rounded-r-full'
-                              : nextVisited
-                                ? 'w-full h-7 bg-gradient-to-r from-amber-500 to-orange-500 rounded-l-full'
-                                : 'w-7 h-7 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.4)]'
+                          ? 'w-full h-7 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500'
+                          : prevVisited
+                            ? 'w-full h-7 bg-gradient-to-r from-orange-500 to-amber-500 rounded-r-full'
+                            : nextVisited
+                              ? 'w-full h-7 bg-gradient-to-r from-amber-500 to-orange-500 rounded-l-full'
+                              : 'w-7 h-7 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.4)]'
                           }`}
                       >
                         {isToday ? <Flame className="w-3.5 h-3.5" /> : day}
@@ -346,7 +367,7 @@ export const StreakDrawer: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-base font-black text-white leading-none">
-                      12
+                      {longestStreak}
                     </div>
                     <div className="text-[9px] font-bold text-gray-500 mt-1.5 uppercase tracking-wider">
                       Longest Streak
@@ -361,7 +382,7 @@ export const StreakDrawer: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-base font-black text-white leading-none">
-                      87%
+                      {consistencyPercent}%
                     </div>
                     <div className="text-[9px] font-bold text-gray-500 mt-1.5 uppercase tracking-wider">
                       Consistency (This Month)
@@ -386,7 +407,7 @@ export const StreakDrawer: React.FC = () => {
               </div>
 
               {/* View Stats Action Button */}
-              <button 
+              <button
                 onClick={() => showNotification('📊 Detailed stats are updated dynamically as you study!')}
                 className="w-full py-2 bg-cyan-950/20 hover:bg-cyan-950/40 border border-cyan-500/30 text-cyan-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer mt-5"
               >
@@ -430,16 +451,14 @@ export const StreakDrawer: React.FC = () => {
                 </div>
 
                 {/* Toggle Button */}
-                <button 
+                <button
                   onClick={handleToggleReminder}
-                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
-                    reminderActive ? 'bg-orange-500' : 'bg-white/10 border border-white/10'
-                  }`}
-                >
-                  <div 
-                    className={`w-3.5 h-3.5 rounded-full bg-white transition-transform duration-200 transform ${
-                      reminderActive ? 'translate-x-4' : 'translate-x-0'
+                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${reminderActive ? 'bg-orange-500' : 'bg-white/10 border border-white/10'
                     }`}
+                >
+                  <div
+                    className={`w-3.5 h-3.5 rounded-full bg-white transition-transform duration-200 transform ${reminderActive ? 'translate-x-4' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
