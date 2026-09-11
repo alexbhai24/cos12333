@@ -64,6 +64,7 @@ export type PageRoute =
   | 'focus-clock'
   | 'link'
   | 'tools'
+  | 'mistake-tracker'
   | 'flashcards'
   | 'syllabus-tracker'
   | 'reading-room'

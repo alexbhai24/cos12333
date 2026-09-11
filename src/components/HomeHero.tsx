@@ -1,10 +1,12 @@
 import React from 'react';
 import { ArrowRight, Sparkles, MessageSquare, Play, Flame, Award, Cpu, BookOpen, Layers, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { normalizeGrade } from '../utils/gradeUtils';
 
 export const HomeHero: React.FC = () => {
   const { user, setCurrentRoute, posts } = useApp();
+  const { authLoading } = useAuth();
   const normalizedGrade = normalizeGrade(user?.gradeLevel).toUpperCase();
 
   return (
@@ -42,12 +44,16 @@ export const HomeHero: React.FC = () => {
         </div>
 
         {/* Dynamic Welcome Heading */}
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3 font-heading">
-          Welcome Back,{' '}
-          <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-            {user?.name || 'Cosmic Student'}
-          </span>{' '}
-          🚀
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3 font-heading flex flex-wrap items-center gap-2">
+          <span>Welcome Back,</span>
+          {authLoading ? (
+            <span className="inline-block w-48 sm:w-64 h-8 sm:h-12 bg-white/10 animate-pulse rounded-2xl align-middle" />
+          ) : (
+            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+              {user?.name || 'Cosmic Student'}
+            </span>
+          )}
+          <span>🚀</span>
         </h1>
 
         {/* Supporting Text */}

@@ -22,21 +22,20 @@ export interface SyllabusSubject {
 }
 
 export type Subject = SyllabusSubject;
-export type Chapter = SyllabusChapter;
-export type Topic = SyllabusTopic;
 
 export interface SyllabusData {
-  id: string;
-  examOrBoard: string;
+  id: string; // Unique ID like cbse_12_commerce
+  examOrBoard: string; // 'CBSE', 'ICSE', 'UP Board', 'NEET', 'JEE'
   category: 'School' | 'Special';
-  classGrade?: string;
-  stream?: string;
+  classGrade?: string; // '6', '7', '8', '9', '10', '11', '12'
+  stream?: string; // 'PCB', 'PCM', 'Commerce', 'Arts' - Only for 11 & 12
   academicSession: string;
   sourceUrl: string;
   verificationDate: string;
   subjects: SyllabusSubject[];
 }
 
+// User Progress Types (Stored in LocalStorage)
 export interface TopicProgress {
   [topicId: string]: boolean;
 }
@@ -56,7 +55,7 @@ export interface SubjectProgress {
 
 export interface OverallProgress {
   [examId: string]: {
-    topicState: TopicProgress;
+    topicState: TopicProgress; // Flat map of topicId -> boolean
     lastUpdated: number;
   };
 }

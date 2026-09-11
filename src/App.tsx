@@ -41,6 +41,7 @@ import { FirestoreDashboardPage } from './pages/FirestoreDashboardPage';
 import { ToolsPage } from './pages/ToolsPage';
 import { SyllabusTrackerPage } from './pages/SyllabusTrackerPage';
 import { FlashcardsPage } from './pages/FlashcardsPage';
+import { MistakeTrackerPage } from './pages/MistakeTrackerPage';
 
 
 
@@ -157,6 +158,7 @@ const AppContent: React.FC = () => {
       case 'focus-clock': return <FocusClockPage />;
       case 'link': return <LinkPage />;
       case 'tools': return <ToolsPage />;
+      case 'mistake-tracker': return <MistakeTrackerPage />;
       case 'flashcards': return <FlashcardsPage />;
       case 'syllabus-tracker': return <SyllabusTrackerPage />;
       case 'reading-room': return <BooksPage />;
@@ -239,4 +241,3 @@ export function App() {
 
 export default App;
 
- 

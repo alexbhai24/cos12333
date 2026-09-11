@@ -19,6 +19,7 @@ import { AvatarDecoration } from './AvatarDecoration';
 import { TransparentImage } from './TransparentImage';
 import type { Theme, BackgroundType } from '../types';
 import streak3d from '../assets/streak_3d.png';
+import { DotLoader } from './DotLoader';
 
 import { teacherRequestService } from '../services/teacherRequestService';
 
@@ -40,7 +41,7 @@ export const TopBar: React.FC = () => {
     setIsSavedItemsOpen,
     setIsAdminConsoleOpen
   } = useApp();
-  const { userRole, currentUser, logout } = useAuth();
+  const { userRole, currentUser, authLoading, logout } = useAuth();
 
   const handleLogout = async () => {
     setProfileDropdownOpen(false);
@@ -174,7 +175,7 @@ export const TopBar: React.FC = () => {
       {/* Right side: Streak, Apples, Profile */}
       <div className="flex items-center space-x-1.5 sm:space-x-3 flex-shrink-0">
 
-
+        <DotLoader isLoading={authLoading} />
 
         {/* Streak Button */}
         {(() => {

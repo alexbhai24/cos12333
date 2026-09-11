@@ -7,7 +7,8 @@ import {
   Bookmark,
   Plus,
   Sparkles,
-  Send
+  Send,
+  Trash2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Post } from '../types';
@@ -16,6 +17,7 @@ export const PostsPage: React.FC = () => {
   const {
     posts,
     addPost,
+    deletePost,
     toggleLikePost,
     addCommentToPost,
     savedItemIds,
@@ -343,6 +345,19 @@ export const PostsPage: React.FC = () => {
                       title="Share post"
                     >
                       <Share2 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Delete Post */}
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Delete this post?')) {
+                          deletePost(post.id);
+                        }
+                      }}
+                      className="p-2 rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-rose-400 hover:border-rose-500/40 hover:bg-rose-500/10 transition-colors"
+                      title="Delete post"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
