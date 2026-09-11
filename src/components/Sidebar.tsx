@@ -15,6 +15,8 @@ import {
   Cpu,
   Timer,
   Globe,
+  Wrench,
+  Layers,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -58,6 +60,8 @@ export const Sidebar: React.FC = () => {
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
     { id: 'focus-clock', label: 'Focus Clock', icon: Timer },
     { id: 'link', label: 'Link', icon: Globe },
+    { id: 'tools', label: 'Tools', icon: Wrench },
+    { id: 'flashcards', label: 'Flashcards', icon: Layers },
   ];
 
   const adminItems: NavItem[] = [
