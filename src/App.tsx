@@ -38,17 +38,11 @@ import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { FocusClockPage } from './pages/FocusClockPage';
 import { LinkPage } from './pages/LinkPage';
 import { FirestoreDashboardPage } from './pages/FirestoreDashboardPage';
+import { ToolsPage } from './pages/ToolsPage';
+import { SyllabusTrackerPage } from './pages/SyllabusTrackerPage';
+import { FlashcardsPage } from './pages/FlashcardsPage';
 
-const ToolsPage: React.FC = () => (
-  <div className="p-8 max-w-4xl mx-auto">
-    <h1 className="text-3xl font-black text-white mb-6 uppercase tracking-wider font-heading">
-      Tools & Utilities
-    </h1>
-    <div className="bg-[#09152B] border border-cyan-500/30 rounded-3xl p-8 text-center text-gray-400">
-      Tools section is under construction. Coming soon!
-    </div>
-  </div>
-);
+
 
 const AppContent: React.FC = () => {
   const {
@@ -80,7 +74,7 @@ const AppContent: React.FC = () => {
     activeTestModal,
     setActiveTestModal,
   } = useApp();
-  const { currentUser, authLoading, pendingVerificationEmail, userRole } = useAuth();
+  const { currentUser, authLoading, pendingVerificationEmail, userRole, userProfile } = useAuth();
 
   // Global Escape key listener — closes the innermost open modal
   useEffect(() => {
@@ -130,22 +124,7 @@ const AppContent: React.FC = () => {
     isStreakDrawerOpen, isAppleShopOpen,
   ]);
 
-  // 1. Firebase is resolving auth state — show the real app shell to make it feel instantly loaded
-  if (authLoading) {
-    return (
-      <div className="min-h-screen relative font-sans text-white select-none overflow-x-hidden">
-        <BackgroundCanvas />
-        <TopBar />
-        <Sidebar />
-        <main className={`relative z-10 pt-20 pb-12 px-4 sm:px-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
-          <div className="max-w-[1366px] mx-auto">
-            {/* Empty space during split-second loading */}
-            <div className="h-64" />
-          </div>
-        </main>
-      </div>
-    );
-  }
+
 
   // 2. Waiting for email verification
   if (pendingVerificationEmail) {
@@ -153,12 +132,12 @@ const AppContent: React.FC = () => {
   }
 
   // 3. Not signed in → auth screen
-  if (!currentUser) {
+  if (!currentUser && !authLoading) {
     return <AuthPage />;
   }
 
   // 4. Signed in but profile setup not completed
-  if (user && user.setupComplete === false) {
+  if (currentUser && userProfile && userProfile.setupComplete === false) {
     return <ProfileSetupModal />;
   }
 
@@ -177,8 +156,10 @@ const AppContent: React.FC = () => {
       case 'portfolio': return <PortfolioPage />;
       case 'focus-clock': return <FocusClockPage />;
       case 'link': return <LinkPage />;
-      case 'tools':
-      case 'reading-room': return <ToolsPage />;
+      case 'tools': return <ToolsPage />;
+      case 'flashcards': return <FlashcardsPage />;
+      case 'syllabus-tracker': return <SyllabusTrackerPage />;
+      case 'reading-room': return <BooksPage />;
       case 'admin-dashboard':
       case 'admin-users':
         return userRole === 'admin' ? <FirestoreDashboardPage /> : <AccessDeniedPage />;
