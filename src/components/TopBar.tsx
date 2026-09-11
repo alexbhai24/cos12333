@@ -38,8 +38,7 @@ export const TopBar: React.FC = () => {
     setIsProfileSettingsOpen,
     setIsStreakDrawerOpen,
     setIsAppleShopOpen,
-    setIsSavedItemsOpen,
-    setIsAdminConsoleOpen
+    setIsSavedItemsOpen
   } = useApp();
   const { userRole, currentUser, authLoading, logout } = useAuth();
 
@@ -322,7 +321,7 @@ export const TopBar: React.FC = () => {
               {(userRole === 'admin' || user.isAdmin) && (
                 <button
                   onClick={() => {
-                    setIsAdminConsoleOpen(true);
+                    setCurrentRoute('admin-dashboard');
                     setProfileDropdownOpen(false);
                   }}
                   className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-surface-secondary)] rounded-xl transition-colors font-bold"

@@ -20,6 +20,7 @@ import { AppleShopDrawer } from './components/drawers/AppleShopDrawer';
 import { AdminConsoleModal } from './components/modals/AdminConsoleModal';
 import { SavedItemsModal } from './components/modals/SavedItemsModal';
 import { Bell, Loader2 } from 'lucide-react';
+import { MobileBottomNav } from './components/MobileBottomNav';
 
 import { BoneAIFAB } from './components/bone-ai/BoneAIFAB';
 import { BoneAIPopup } from './components/bone-ai/BoneAIPopup';
@@ -38,10 +39,20 @@ import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { FocusClockPage } from './pages/FocusClockPage';
 import { LinkPage } from './pages/LinkPage';
 import { FirestoreDashboardPage } from './pages/FirestoreDashboardPage';
+import { CreatorPage } from './pages/CreatorPage';
 import { ToolsPage } from './pages/ToolsPage';
 import { SyllabusTrackerPage } from './pages/SyllabusTrackerPage';
 import { FlashcardsPage } from './pages/FlashcardsPage';
 import { MistakeTrackerPage } from './pages/MistakeTrackerPage';
+import { PyqPage } from './pages/PyqPage';
+import { MockTestsPage } from './pages/MockTestsPage';
+import { TestInstructionsPage } from './pages/TestInstructionsPage';
+import { NtaTestPage } from './pages/NtaTestPage';
+import { SleepCyclePage } from './pages/SleepCyclePage';
+import { StudyTimeTrackerPage } from './pages/StudyTimeTrackerPage';
+import { MarksCalculatorPage } from './pages/MarksCalculatorPage';
+import { ExamCountdownPage } from './pages/ExamCountdownPage';
+import { ScheduleDayPage } from './pages/ScheduleDayPage';
 
 
 
@@ -161,7 +172,17 @@ const AppContent: React.FC = () => {
       case 'mistake-tracker': return <MistakeTrackerPage />;
       case 'flashcards': return <FlashcardsPage />;
       case 'syllabus-tracker': return <SyllabusTrackerPage />;
+      case 'pyq': return <PyqPage />;
+      case 'mock-tests': return <MockTestsPage />;
+      case 'test-instructions': return <TestInstructionsPage />;
+      case 'nta-test': return <NtaTestPage />;
+      case 'sleep-cycle': return <SleepCyclePage />;
+      case 'study-time-tracker': return <StudyTimeTrackerPage />;
+      case 'marks-calculator': return <MarksCalculatorPage />;
+      case 'exam-countdown': return <ExamCountdownPage />;
+      case 'schedule-day': return <ScheduleDayPage />;
       case 'reading-room': return <BooksPage />;
+      case 'creator-studio': return userRole === 'admin' ? <CreatorPage /> : <AccessDeniedPage />;
       case 'admin-dashboard':
       case 'admin-users':
         return userRole === 'admin' ? <FirestoreDashboardPage /> : <AccessDeniedPage />;
@@ -192,7 +213,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main
-        className={`relative z-10 pt-20 pb-12 px-4 sm:px-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        className={`relative z-10 pt-20 pb-28 lg:pb-12 px-4 sm:px-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
           }`}
       >
         <div className="max-w-[1366px] mx-auto">
@@ -202,6 +223,9 @@ const AppContent: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Mobile floating bottom navigation */}
+      <MobileBottomNav />
 
       {/* Modals */}
       <SearchModal />

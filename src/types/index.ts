@@ -67,10 +67,15 @@ export type PageRoute =
   | 'mistake-tracker'
   | 'flashcards'
   | 'syllabus-tracker'
+  | 'pyq'
   | 'reading-room'
   | 'admin-dashboard'
   | 'admin-users'
-  | 'teacher-console';
+  | 'teacher-console'
+  | 'mock-tests'
+  | 'test-instructions'
+  | 'nta-test'
+  | 'sleep-cycle';
 
 export type StableGrade =
   | 'class_6'

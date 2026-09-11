@@ -61,7 +61,6 @@ export const Sidebar: React.FC = () => {
     { id: 'focus-clock', label: 'Focus Clock', icon: Timer },
     { id: 'link', label: 'Link', icon: Globe },
     { id: 'tools', label: 'Tools', icon: Wrench },
-    { id: 'flashcards', label: 'Flashcards', icon: Layers },
   ];
 
   const adminItems: NavItem[] = [
@@ -69,6 +68,12 @@ export const Sidebar: React.FC = () => {
       id: 'admin-dashboard',
       label: 'Admin Console',
       icon: Database,
+      adminOnly: true,
+    },
+    {
+      id: 'creator-studio',
+      label: 'Creator Studio',
+      icon: Cpu,
       adminOnly: true,
     },
   ];

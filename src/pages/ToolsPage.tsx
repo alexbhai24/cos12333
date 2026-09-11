@@ -13,9 +13,11 @@ import {
   Wrench,
   Moon,
   FileQuestion,
-  Layers
+  Layers,
+  Cpu
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 
 interface ToolCard {
   id: string;
@@ -76,32 +78,26 @@ const TOOLS: ToolCard[] = [
     color: 'text-cyan-400',
   },
   {
-    id: 'time-table-maker',
-    title: 'Time Table Maker',
-    description: 'Design and customize your weekly schedule.',
+    id: 'schedule-day',
+    title: 'Schedule Day',
+    description: 'Plan your day with study blocks, breaks and more.',
     icon: CalendarDays,
     color: 'text-indigo-400',
   },
-  {
-    id: 'time-calculator',
-    title: 'Time Calculator',
-    description: 'Sec, min, hrs, days, weeks, months before exam.',
-    icon: Hourglass,
-    color: 'text-pink-400',
-  },
-  {
-    id: 'motivation',
-    title: 'Why You Should Study',
-    description: 'Find your core motivation and daily inspiration.',
-    icon: Sparkles,
-    color: 'text-yellow-400',
-  },
+
   {
     id: 'sleep-cycle',
-    title: 'Sleep Cycle Calculator',
+    title: 'Sleep Cycle',
     description: 'Optimize your sleep for maximum retention.',
     icon: Moon,
     color: 'text-indigo-300',
+  },
+  {
+    id: 'mock-tests',
+    title: 'Mock Tests',
+    description: 'Full length test simulator for NEET/JEE.',
+    icon: FileQuestion,
+    color: 'text-indigo-400',
   },
   {
     id: 'pyq',
@@ -121,8 +117,18 @@ const TOOLS: ToolCard[] = [
 
 export const ToolsPage: React.FC = () => {
   const { showNotification, setCurrentRoute } = useApp();
+  const { currentUser, userRole } = useAuth();
+  
+  const isOwnerAdmin = currentUser?.email?.toLowerCase().trim() === 'rajanandalex1@gmail.com';
+  const isAdmin = isOwnerAdmin || userRole === 'admin';
+
+  const displayTools = TOOLS;
 
   const handleToolClick = (tool: ToolCard) => {
+    if (tool.id === 'creator-studio') {
+      setCurrentRoute('creator-studio');
+      return;
+    }
     if (tool.id === 'mistake-tracker') {
       setCurrentRoute('mistake-tracker');
       return;
@@ -135,6 +141,34 @@ export const ToolsPage: React.FC = () => {
       setCurrentRoute('flashcards');
       return;
     }
+    if (tool.id === 'sleep-cycle') {
+      setCurrentRoute('sleep-cycle');
+      return;
+    }
+    if (tool.id === 'mock-tests') {
+      setCurrentRoute('mock-tests');
+      return;
+    }
+    if (tool.id === 'pyq') {
+      setCurrentRoute('pyq');
+      return;
+    }
+    if (tool.id === 'study-time-tracker') {
+      setCurrentRoute('study-time-tracker');
+      return;
+    }
+    if (tool.id === 'marks-calculator') {
+      setCurrentRoute('marks-calculator');
+      return;
+    }
+    if (tool.id === 'exam-countdown') {
+      setCurrentRoute('exam-countdown');
+      return;
+    }
+    if (tool.id === 'schedule-day') {
+      setCurrentRoute('schedule-day');
+      return;
+    }
     // For now, we just show a coming soon toast
     showNotification(`${tool.title} is coming soon!`);
   };
@@ -143,9 +177,9 @@ export const ToolsPage: React.FC = () => {
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Tools Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 pt-4">
-        {TOOLS.map((tool) => {
+        {displayTools.map((tool) => {
           const Icon = tool.icon;
-          const isActive = tool.id === 'syllabus-tracker' || tool.id === 'flashcards' || tool.id === 'mistake-tracker';
+          const isActive = ['creator-studio', 'syllabus-tracker', 'flashcards', 'mistake-tracker', 'pyq', 'mock-tests', 'sleep-cycle', 'study-time-tracker', 'marks-calculator', 'exam-countdown', 'schedule-day'].includes(tool.id);
           return (
             <div
               key={tool.id}
