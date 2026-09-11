@@ -251,9 +251,6 @@ export const SyllabusTrackerPage: React.FC = () => {
 
       {/* Subject Pills Row */}
       <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar pb-2 mb-6 border-b border-white/5">
-        <div className="px-3 py-1.5 shrink-0 flex items-center justify-center bg-white/5 rounded-lg border border-white/10">
-          <BookOpen className="w-4 h-4 text-gray-400" />
-        </div>
         {validSubjects.length > 0 ? (
           validSubjects.map(subject => {
             const cleanName = subject.name.replace(/\s*\(Theory:.*?\)/gi, '').replace(/\s*\(.*Marks\)/gi, '').trim();

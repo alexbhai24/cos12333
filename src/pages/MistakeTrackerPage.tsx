@@ -422,11 +422,8 @@ export const MistakeTrackerPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Subject Pills Row (Identical to FlashcardsPage) */}
+      {/* Subject Pills Row */}
       <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar pb-2 mb-6 border-b border-[var(--border-color)]">
-        <div className="px-3 py-1.5 shrink-0 flex items-center justify-center bg-[var(--bg-surface-secondary)] rounded-lg border border-[var(--border-color)]">
-          <BookOpen className="w-4 h-4 text-[var(--color-primary)]" />
-        </div>
         {validSubjects.map(subject => {
           const cleanName = subject.name.replace(/\s*\(Theory:.*?\)/gi, '').replace(/\s*\(.*Marks\)/gi, '').trim();
           const isActive = activeSubjectId === subject.id;
