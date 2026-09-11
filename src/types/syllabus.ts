@@ -1,4 +1,4 @@
-export type PriorityLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+export type PriorityLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' | string;
 
 export interface SyllabusTopic {
   id: string;
@@ -21,19 +21,22 @@ export interface SyllabusSubject {
   chapters: SyllabusChapter[];
 }
 
+export type Subject = SyllabusSubject;
+export type Chapter = SyllabusChapter;
+export type Topic = SyllabusTopic;
+
 export interface SyllabusData {
-  id: string; // Unique ID like cbse_12_commerce
-  examOrBoard: string; // 'CBSE', 'ICSE', 'UP Board', 'NEET', 'JEE'
+  id: string;
+  examOrBoard: string;
   category: 'School' | 'Special';
-  classGrade?: string; // '6', '7', '8', '9', '10', '11', '12'
-  stream?: string; // 'PCB', 'PCM', 'Commerce', 'Arts' - Only for 11 & 12
+  classGrade?: string;
+  stream?: string;
   academicSession: string;
   sourceUrl: string;
   verificationDate: string;
   subjects: SyllabusSubject[];
 }
 
-// User Progress Types (Stored in LocalStorage)
 export interface TopicProgress {
   [topicId: string]: boolean;
 }
@@ -53,7 +56,7 @@ export interface SubjectProgress {
 
 export interface OverallProgress {
   [examId: string]: {
-    topicState: TopicProgress; // Flat map of topicId -> boolean
+    topicState: TopicProgress;
     lastUpdated: number;
   };
 }
