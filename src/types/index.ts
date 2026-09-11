@@ -75,7 +75,11 @@ export type PageRoute =
   | 'mock-tests'
   | 'test-instructions'
   | 'nta-test'
-  | 'sleep-cycle';
+  | 'sleep-cycle'
+  | 'study-time-tracker'
+  | 'marks-calculator'
+  | 'exam-countdown'
+  | 'schedule-day';
 
 export type StableGrade =
   | 'class_6'
