@@ -14,6 +14,7 @@ import { storage } from '../firebase';
 import { getChapterUnitTheme } from '../utils/flashcardUnitTheme';
 import { CsvUploader } from '../components/creator-studio/CsvUploader';
 import { TestBuilderModal } from '../components/creator-studio/TestBuilderModal';
+import { DailyStatusManagerModal } from '../components/creator-studio/DailyStatusManagerModal';
 import { useCreatorStudioStorage } from '../hooks/useCreatorStudioStorage';
 import { CustomTest } from '../types/creatorStudio';
 import { QuestionSolutionTabs } from '../components/QuestionSolutionTabs';
@@ -1190,7 +1191,8 @@ const QuestionBank: React.FC<{
   onDelete: (id: string) => void;
   onDuplicate: (q: Question) => void;
   onOpenTestBuilder: () => void;
-}> = ({ questions, selectedQuestions, toggleSelect, toggleSelectAll, onAdd, onBulkAdd, onEdit, onDelete, onDuplicate, onOpenTestBuilder }) => {
+  onOpenDailyStatusModal: () => void;
+}> = ({ questions, selectedQuestions, toggleSelect, toggleSelectAll, onAdd, onBulkAdd, onEdit, onDelete, onDuplicate, onOpenTestBuilder, onOpenDailyStatusModal }) => {
   const [search, setSearch] = useState('');
   const [selectedExam, setSelectedExam] = useState<ExamType>('neet');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -1278,6 +1280,14 @@ const QuestionBank: React.FC<{
 
           {/* Add Button and Action */}
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={onOpenDailyStatusModal}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-purple-300 transition-all cursor-pointer shadow-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/40 relative overflow-hidden hover-shine-effect"
+            >
+              <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+              <span>Daily Status Questions</span>
+            </button>
+
             {selectedQuestions.length > 0 && (
               <button
                 onClick={onOpenTestBuilder}
@@ -1682,6 +1692,7 @@ export const CreatorPage: React.FC = () => {
   
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [isTestBuilderOpen, setIsTestBuilderOpen] = useState(false);
+  const [isDailyStatusModalOpen, setIsDailyStatusModalOpen] = useState(false);
   const { tests, addTest } = useCreatorStudioStorage();
   const toggleSelect = (id: string) => {
     setSelectedQuestions(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
@@ -1781,6 +1792,7 @@ export const CreatorPage: React.FC = () => {
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
           onOpenTestBuilder={() => setIsTestBuilderOpen(true)}
+          onOpenDailyStatusModal={() => setIsDailyStatusModalOpen(true)}
         />
       )}
 
@@ -1794,6 +1806,13 @@ export const CreatorPage: React.FC = () => {
             setView('tests');
             setSelectedQuestions([]); // clear selection after creating test
           }}
+        />
+      )}
+
+      {isDailyStatusModalOpen && (
+        <DailyStatusManagerModal
+          isOpen={isDailyStatusModalOpen}
+          onClose={() => setIsDailyStatusModalOpen(false)}
         />
       )}
     </div>

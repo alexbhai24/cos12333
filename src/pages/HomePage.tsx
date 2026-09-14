@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { HomeHero } from '../components/HomeHero';
+import { DailyStatusBar } from '../components/DailyStatusBar';
 import { AppleTreeWidget } from '../components/AppleTreeWidget';
 import { FocusClockCard } from '../components/FocusClockCard';
 import { MusicPlayerWidget } from '../components/MusicPlayerWidget';
@@ -55,6 +56,9 @@ export const HomePage: React.FC = () => {
         
         {/* LEFT COLUMN (8 Cols) */}
         <div className="lg:col-span-8 space-y-8">
+
+          {/* QUESTION OF THE DAY INSTAGRAM STATUS BAR */}
+          <DailyStatusBar onOpenStreakDrawer={() => setIsStreakDrawerOpen(true)} />
 
           {/* COSMIC APPLE ORCHARD WIDGET (Preserved & Featured) */}
           <AppleTreeWidget />
