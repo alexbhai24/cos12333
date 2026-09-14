@@ -103,7 +103,7 @@ export const HomePage: React.FC = () => {
                   <div
                     key={p.id}
                     onClick={() => setCurrentRoute('posts')}
-                    className="p-4 bg-[var(--bg-surface-solid)]/60 border border-white/5 rounded-2xl hover:border-[var(--color-cyan)]/30 transition-all cursor-pointer group"
+                    className="p-4 bg-[var(--bg-surface-solid)]/60 border border-white/5 rounded-2xl hover:border-[var(--color-cyan)]/30 transition-all cursor-pointer group relative overflow-hidden hover-shine-effect"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
@@ -150,7 +150,7 @@ export const HomePage: React.FC = () => {
               {/* Test Series Card */}
               <div
                 onClick={() => setCurrentRoute('tests')}
-                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden"
+                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden hover-shine-effect"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-[var(--color-violet)]/10 border border-[var(--color-violet)]/30 rounded-2xl text-[var(--color-violet)]">
@@ -175,7 +175,7 @@ export const HomePage: React.FC = () => {
               {/* Study Rooms Card */}
               <div
                 onClick={() => setCurrentRoute('study-rooms')}
-                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden"
+                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden hover-shine-effect"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-[var(--color-cyan)]/10 border border-[var(--color-cyan)]/30 rounded-2xl text-[var(--color-cyan)]">
@@ -200,7 +200,7 @@ export const HomePage: React.FC = () => {
               {/* Documents Card */}
               <div
                 onClick={() => setCurrentRoute('documents')}
-                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden"
+                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden hover-shine-effect"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-[var(--color-success)]/10 border border-[var(--color-success)]/30 rounded-2xl text-[var(--color-success)]">
@@ -225,7 +225,7 @@ export const HomePage: React.FC = () => {
               {/* Games Hub Card */}
               <div
                 onClick={() => setCurrentRoute('games')}
-                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden"
+                className="p-5 bg-gradient-to-br from-[var(--bg-surface-solid)] to-[var(--bg-surface-secondary)] border border-[var(--border-color)] rounded-3xl hover:border-[var(--color-cyan)]/50 transition-all cursor-pointer group shadow-xl relative overflow-hidden hover-shine-effect"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 rounded-2xl text-[var(--color-warning)]">
@@ -256,7 +256,7 @@ export const HomePage: React.FC = () => {
         <div className="lg:col-span-4 space-y-6">
 
           {/* Bone AI Companion Launcher Card */}
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-5 shadow-2xl space-y-3 relative overflow-hidden">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-5 shadow-2xl space-y-3 relative overflow-hidden hover-shine-effect">
             <div className="flex items-center space-x-2.5">
               <div className="p-2 bg-[var(--color-violet)]/15 border border-[var(--color-violet)]/35 rounded-xl text-[var(--color-violet)]">
                 <Bot className="w-5 h-5" />
@@ -269,7 +269,7 @@ export const HomePage: React.FC = () => {
 
             <div
               onClick={() => setIsBoneAIOpen(true)}
-              className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] rounded-2xl text-xs text-[var(--text-secondary)] hover:text-white hover:border-[var(--color-cyan)] transition-all cursor-pointer flex items-center justify-between"
+              className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] rounded-2xl text-xs text-[var(--text-secondary)] hover:text-white hover:border-[var(--color-cyan)] transition-all cursor-pointer flex items-center justify-between relative overflow-hidden hover-shine-effect"
             >
               <span>Ask Bone AI a question...</span>
               <Sparkles className="w-4 h-4 text-[var(--color-cyan)] animate-pulse" />
@@ -295,7 +295,7 @@ export const HomePage: React.FC = () => {
                   <button
                     onClick={() => setIsStreakDrawerOpen(true)}
                     type="button"
-                    className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-orange-500/50 hover:bg-orange-500/10 rounded-2xl text-center transition-all cursor-pointer group active:scale-95 text-left flex flex-col items-center justify-center shadow-sm"
+                    className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-orange-500/50 hover:bg-orange-500/10 rounded-2xl text-center transition-all cursor-pointer group active:scale-95 text-left flex flex-col items-center justify-center shadow-sm relative overflow-hidden hover-shine-effect"
                     title="Click to view Cosmic Streak Society & Check-In 🔥"
                   >
                     <div className="text-[10px] text-[var(--text-muted)] group-hover:text-orange-300 font-semibold mb-0.5 transition-colors">Daily Streak</div>
@@ -315,7 +315,7 @@ export const HomePage: React.FC = () => {
               <button
                 onClick={() => setIsAppleShopOpen(true)}
                 type="button"
-                className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-2xl text-center transition-all cursor-pointer group active:scale-95 text-left flex flex-col items-center justify-center shadow-sm"
+                className="p-3 bg-[var(--bg-surface-solid)] border border-[var(--border-color)] hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-2xl text-center transition-all cursor-pointer group active:scale-95 text-left flex flex-col items-center justify-center shadow-sm relative overflow-hidden hover-shine-effect"
                 title="Click to open Apple Shop & Vault 🍏"
               >
                 <div className="text-[10px] text-[var(--text-muted)] group-hover:text-emerald-300 font-semibold mb-0.5 transition-colors">Apples Balance</div>
@@ -330,7 +330,7 @@ export const HomePage: React.FC = () => {
             <button
               onClick={() => setIsSavedItemsOpen(true)}
               type="button"
-              className="w-full py-2.5 bg-white/5 hover:bg-[var(--color-cyan)]/15 border border-white/10 hover:border-[var(--color-cyan)]/40 text-xs font-bold text-gray-300 hover:text-white rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow-sm"
+              className="w-full py-2.5 bg-white/5 hover:bg-[var(--color-cyan)]/15 border border-white/10 hover:border-[var(--color-cyan)]/40 text-xs font-bold text-gray-300 hover:text-white rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow-sm relative overflow-hidden hover-shine-effect"
               title="Open Learning Library (Saved Items) 🔖"
             >
               <Book className="w-4 h-4 text-[var(--color-cyan)]" />
@@ -342,7 +342,7 @@ export const HomePage: React.FC = () => {
           <FocusClockCard onNavigate={() => setCurrentRoute('focus-clock')} />
 
           {/* Live Study Rooms Radar */}
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-5 shadow-xl space-y-3">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-5 shadow-xl space-y-3 relative overflow-hidden hover-shine-effect">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-white font-bold text-xs uppercase tracking-wider">
                 <Users className="w-4 h-4 text-[var(--color-cyan)]" />
@@ -357,7 +357,7 @@ export const HomePage: React.FC = () => {
 
             <button
               onClick={() => setCurrentRoute('study-rooms')}
-              className="w-full py-2.5 bg-[var(--color-cyan)]/10 hover:bg-[var(--color-cyan)]/20 border border-[var(--color-cyan)]/35 text-[var(--color-cyan)] font-extrabold text-xs rounded-xl transition-all flex items-center justify-center space-x-1.5 active:scale-95"
+              className="w-full py-2.5 bg-[var(--color-cyan)]/10 hover:bg-[var(--color-cyan)]/20 border border-[var(--color-cyan)]/35 text-[var(--color-cyan)] font-extrabold text-xs rounded-xl transition-all flex items-center justify-center space-x-1.5 active:scale-95 relative overflow-hidden hover-shine-effect"
             >
               <span>Join Active Lounges 🎧</span>
             </button>

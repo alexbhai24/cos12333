@@ -197,7 +197,7 @@ export const ToolsPage: React.FC = () => {
             <div
               key={tool.id}
               onClick={() => handleToolClick(tool)}
-              className="group relative bg-[var(--bg-surface-solid)]/40 backdrop-blur-md border border-white/5 hover:border-[var(--color-cyan)]/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,240,255,0.15)] overflow-hidden flex flex-col justify-between"
+              className="group relative bg-[var(--bg-surface-solid)]/40 backdrop-blur-md border border-white/5 hover:border-[var(--color-cyan)]/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,240,255,0.15)] overflow-hidden flex flex-col justify-between hover-shine-effect"
             >
               {/* Dynamic Gradient Background on Hover */}
               <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-cyan)]/0 via-[var(--color-cyan)]/5 to-[var(--color-cyan)]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

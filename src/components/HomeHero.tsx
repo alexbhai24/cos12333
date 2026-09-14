@@ -65,7 +65,7 @@ export const HomeHero: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3 mb-8">
           <button
             onClick={() => setCurrentRoute('posts')}
-            className="flex items-center space-x-2 px-5 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-cyan-500/25 transition-all active:scale-95"
+            className="flex items-center space-x-2 px-5 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-cyan-500/25 transition-all active:scale-95 relative overflow-hidden hover-shine-effect"
           >
             <MessageSquare className="w-4 h-4" />
             <span>Academic Feed</span>
@@ -73,7 +73,7 @@ export const HomeHero: React.FC = () => {
 
           <button
             onClick={() => setCurrentRoute('study-rooms')}
-            className="flex items-center space-x-2 px-5 py-3 bg-[var(--bg-surface-solid)] hover:bg-white/10 border border-cyan-500/30 text-cyan-300 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95"
+            className="flex items-center space-x-2 px-5 py-3 bg-[var(--bg-surface-solid)] hover:bg-white/10 border border-cyan-500/30 text-cyan-300 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95 relative overflow-hidden hover-shine-effect"
           >
             <Users className="w-4 h-4 text-cyan-400" />
             <span>Live Study Rooms</span>
@@ -81,7 +81,7 @@ export const HomeHero: React.FC = () => {
 
           <button
             onClick={() => setCurrentRoute('tests')}
-            className="flex items-center space-x-2 px-5 py-3 bg-[var(--bg-surface-solid)] hover:bg-white/10 border border-purple-500/30 text-purple-300 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95"
+            className="flex items-center space-x-2 px-5 py-3 bg-[var(--bg-surface-solid)] hover:bg-white/10 border border-purple-500/30 text-purple-300 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95 relative overflow-hidden hover-shine-effect"
           >
             <BookOpen className="w-4 h-4 text-purple-400" />
             <span>Test Series</span>
@@ -89,7 +89,7 @@ export const HomeHero: React.FC = () => {
 
           <button
             onClick={() => setCurrentRoute('games')}
-            className="flex items-center space-x-2 px-5 py-3 bg-[var(--bg-surface-solid)] hover:bg-white/10 border border-amber-500/30 text-amber-300 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95"
+            className="flex items-center space-x-2 px-5 py-3 bg-[var(--bg-surface-solid)] hover:bg-white/10 border border-amber-500/30 text-amber-300 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95 relative overflow-hidden hover-shine-effect"
           >
             <Cpu className="w-4 h-4 text-amber-400" />
             <span>Bone Games</span>
