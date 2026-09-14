@@ -14,6 +14,7 @@ import { HabitRadarOverallView } from '../components/habit-radar/HabitRadarOvera
 import { CreateHabitModal } from '../components/habit-radar/CreateHabitModal';
 import { HabitSettingsModal } from '../components/habit-radar/HabitSettingsModal';
 import { HabitTimerModal } from '../components/habit-radar/HabitTimerModal';
+import { HabitOnboardingWizard } from '../components/habit-radar/HabitOnboardingWizard';
 
 type ActiveTab = 'today' | 'weekly' | 'monthly' | 'overall';
 
@@ -24,6 +25,7 @@ export const HabitRadarPage: React.FC = () => {
   const [habits, setHabits] = useState<Habit[]>(() => habitRadarStorage.getHabits());
   const [logs, setLogs] = useState<HabitLogs>(() => habitRadarStorage.getLogs());
   const [settings, setSettings] = useState<HabitSettings>(() => habitRadarStorage.getSettings());
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => !habitRadarStorage.hasCompletedOnboarding());
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -73,6 +75,20 @@ export const HabitRadarPage: React.FC = () => {
     setSettings(newSettings);
     habitRadarStorage.saveSettings(newSettings);
   };
+
+  if (showOnboarding) {
+    return (
+      <div className="p-3 sm:p-6 max-w-5xl mx-auto font-sans select-none">
+        <HabitOnboardingWizard
+          onFinish={(newHabits) => {
+            setHabits(newHabits);
+            setLogs(habitRadarStorage.getLogs());
+            setShowOnboarding(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-3 sm:p-6 max-w-5xl mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans select-none">
@@ -244,6 +260,7 @@ export const HabitRadarPage: React.FC = () => {
           setLogs(habitRadarStorage.getLogs());
           setSettings(habitRadarStorage.getSettings());
         }}
+        onReRunOnboarding={() => setShowOnboarding(true)}
       />
 
       <HabitTimerModal

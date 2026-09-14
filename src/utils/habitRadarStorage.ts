@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   HABITS: 'cosmic_habit_radar_habits_v1',
   LOGS: 'cosmic_habit_radar_logs_v1',
   SETTINGS: 'cosmic_habit_radar_settings_v1',
+  ONBOARDING: 'cosmic_habit_radar_onboarding_v1',
 };
 
 // Date helper: returns 'YYYY-MM-DD'
@@ -47,10 +48,27 @@ export const habitRadarStorage = {
         }
       }
     } catch {}
-    // Seed initial habits only on very first launch when key doesn't exist
-    this.saveHabits(DEFAULT_HABITS);
-    this.seedInitialLogs();
-    return DEFAULT_HABITS;
+    // Return empty array by default (no pre-existing dummy habits)
+    return [];
+  },
+
+  hasCompletedOnboarding(): boolean {
+    try {
+      const habits = this.getHabits();
+      if (habits.length > 0) return true;
+      const val = localStorage.getItem(STORAGE_KEYS.ONBOARDING);
+      return val === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  setOnboardingCompleted(completed = true) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ONBOARDING, completed ? 'true' : 'false');
+    } catch (e) {
+      console.error('Failed to save onboarding status:', e);
+    }
   },
 
   saveHabits(habits: Habit[]) {

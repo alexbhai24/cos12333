@@ -17,6 +17,7 @@ interface HabitSettingsModalProps {
   onDeleteHabit: (habitId: string) => void;
   onCreateHabit: () => void;
   onDataRefresh: () => void;
+  onReRunOnboarding?: () => void;
 }
 
 export const HabitSettingsModal: React.FC<HabitSettingsModalProps> = ({
@@ -29,6 +30,7 @@ export const HabitSettingsModal: React.FC<HabitSettingsModalProps> = ({
   onDeleteHabit,
   onCreateHabit,
   onDataRefresh,
+  onReRunOnboarding,
 }) => {
   const [activeNav, setActiveNav] = useState<'habits' | 'preferences' | 'data'>('habits');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -468,6 +470,22 @@ export const HabitSettingsModal: React.FC<HabitSettingsModalProps> = ({
                   className="hidden"
                 />
               </div>
+
+              {/* Restart Setup Wizard */}
+              {onReRunOnboarding && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onReRunOnboarding();
+                    }}
+                    className="w-full py-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Run 3-Step Setup Wizard Again</span>
+                  </button>
+                </div>
+              )}
 
               {/* Reset / Clear Data */}
               <div className="pt-2">
