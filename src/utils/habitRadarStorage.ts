@@ -115,32 +115,12 @@ export const habitRadarStorage = {
     }
   },
 
-  // Seed recent completions so the weekly and monthly grids look alive on first load
+  // Seed initial logs (no-op to prevent fake streak logs)
   seedInitialLogs() {
-    const today = new Date();
-    const logs: HabitLogs = {};
-
-    const habitsToSeed = [
-      { id: 'habit_1', daysBack: [0, 1] },
-      { id: 'habit_2', daysBack: [0, 1] },
-      { id: 'habit_4', daysBack: [0, 1, 3] },
-      { id: 'habit_5', daysBack: [0, 2] },
-      { id: 'habit_7', daysBack: [0, 1] },
-    ];
-
-    habitsToSeed.forEach(({ id, daysBack }) => {
-      logs[id] = {};
-      daysBack.forEach(offset => {
-        const d = new Date(today);
-        d.setDate(d.getDate() - offset);
-        logs[id][formatDateKey(d)] = { completed: true, count: 1 };
-      });
-    });
-
-    this.saveLogs(logs);
+    // No mock seeding — real user data only
   },
 
-  // Toggle habit for a given date
+  // Toggle habit for a given date (Single Click Completion)
   toggleHabitDay(habitId: string, dateStr: string, soundEnabled = true): HabitLogs {
     const logs = this.getLogs();
     const habitLogs = logs[habitId] || {};
@@ -149,25 +129,28 @@ export const habitRadarStorage = {
     const habits = this.getHabits();
     const habit = habits.find(h => h.id === habitId);
 
+    const isCurrentlyCompleted = !!current?.completed;
+    const nextCompleted = !isCurrentlyCompleted;
+
     let nextLog: DayLog;
     if (habit?.trackType === 'amount') {
       const target = habit.targetAmount || 1;
-      const currentCount = current?.count || 0;
-      if (currentCount >= target) {
-        nextLog = { completed: false, count: 0 };
-      } else {
-        const newCount = currentCount + 1;
-        nextLog = { completed: newCount >= target, count: newCount };
-      }
+      nextLog = {
+        completed: nextCompleted,
+        count: nextCompleted ? target : 0,
+      };
+    } else if (habit?.trackType === 'time') {
+      const targetSecs = (habit.targetMinutes || 15) * 60;
+      nextLog = {
+        completed: nextCompleted,
+        elapsedSeconds: nextCompleted ? targetSecs : 0,
+      };
     } else {
-      const isCompleted = !(current?.completed);
-      nextLog = { completed: isCompleted };
+      nextLog = { completed: nextCompleted };
     }
 
-    if (nextLog.completed) {
+    if (nextCompleted) {
       playSoftTickSound(soundEnabled, true);
-    } else if (habit?.trackType === 'amount' && nextLog.count && nextLog.count > 0) {
-      playSoftTickSound(soundEnabled, false);
     }
 
     logs[habitId] = {

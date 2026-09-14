@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Check, Flame, ChevronLeft, ChevronRight, Play, Plus, Edit3 } from 'lucide-react';
 import { Habit, HabitLogs, HabitSettings } from '../../types/habitRadar';
 import { LUCIDE_ICONS_MAP } from './IconPickerModal';
-import { formatDateKey } from '../../utils/habitRadarStorage';
+import { formatDateKey, habitRadarStorage } from '../../utils/habitRadarStorage';
 
 interface HabitRadarMonthlyViewProps {
   habits: Habit[];
@@ -78,28 +78,7 @@ export const HabitRadarMonthlyView: React.FC<HabitRadarMonthlyViewProps> = ({
           const todayLog = logs[habit.id]?.[todayStr];
           const isTodayCompleted = todayLog?.completed ?? false;
 
-          // Calculate streak
-          let streak = 0;
-          const checkDate = new Date();
-          const checkTodayStr = formatDateKey(checkDate);
-          if (logs[habit.id]?.[checkTodayStr]?.completed) {
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-          } else {
-            checkDate.setDate(checkDate.getDate() - 1);
-            if (!logs[habit.id]?.[formatDateKey(checkDate)]?.completed) {
-              streak = 0;
-            }
-          }
-          while (streak > 0) {
-            const dateStr = formatDateKey(checkDate);
-            if (logs[habit.id]?.[dateStr]?.completed) {
-              streak++;
-              checkDate.setDate(checkDate.getDate() - 1);
-            } else {
-              break;
-            }
-          }
+          const streak = habitRadarStorage.calculateStreak(habit.id, logs);
 
           // Generate day dots for the month (e.g. 30/31 days)
           const daysArray = Array.from({ length: daysInMonth }, (_, i) => {
@@ -118,15 +97,14 @@ export const HabitRadarMonthlyView: React.FC<HabitRadarMonthlyViewProps> = ({
               key={habit.id}
               className="bg-[#121422]/70 hover:bg-[#15182a]/90 backdrop-blur-xl border border-white/10 hover:border-emerald-500/30 rounded-3xl p-5 flex flex-col justify-between space-y-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-all duration-300"
             >
-              {/* Card Header */}
+              {/* Card Top Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
                     onClick={() => onEditHabit(habit)}
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center border shrink-0 cursor-pointer shadow-inner"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-transform hover:scale-105"
                     style={{
-                      backgroundColor: `${habit.color}20`,
-                      borderColor: `${habit.color}40`,
+                      backgroundColor: `color-mix(in srgb, ${habit.color} 20%, transparent)`,
                     }}
                   >
                     {IconComp ? (
@@ -143,7 +121,7 @@ export const HabitRadarMonthlyView: React.FC<HabitRadarMonthlyViewProps> = ({
                     >
                       {habit.name}
                     </h3>
-                    {settings.showStreakOn.monthly && (
+                    {settings.showStreakOn.monthly && streak > 0 && (
                       <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-400">
                         <Flame className="w-3 h-3 fill-amber-400 text-amber-400" />
                         <span>{streak} {streak === 1 ? 'Day' : 'Days'}</span>

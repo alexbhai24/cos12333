@@ -2,7 +2,7 @@ import React from 'react';
 import { Check, Flame, Star, Edit3 } from 'lucide-react';
 import { Habit, HabitLogs, HabitSettings } from '../../types/habitRadar';
 import { LUCIDE_ICONS_MAP } from './IconPickerModal';
-import { formatDateKey } from '../../utils/habitRadarStorage';
+import { formatDateKey, habitRadarStorage } from '../../utils/habitRadarStorage';
 
 interface HabitRadarWeeklyViewProps {
   habits: Habit[];
@@ -62,29 +62,7 @@ export const HabitRadarWeeklyView: React.FC<HabitRadarWeeklyViewProps> = ({
     <div className="space-y-4 pb-24">
       {habits.map(habit => {
         const IconComp = LUCIDE_ICONS_MAP[habit.icon];
-
-        // Calculate streak
-        let streak = 0;
-        const checkDate = new Date();
-        const checkTodayStr = formatDateKey(checkDate);
-        if (logs[habit.id]?.[checkTodayStr]?.completed) {
-          streak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-        } else {
-          checkDate.setDate(checkDate.getDate() - 1);
-          if (!logs[habit.id]?.[formatDateKey(checkDate)]?.completed) {
-            streak = 0;
-          }
-        }
-        while (streak > 0) {
-          const dateStr = formatDateKey(checkDate);
-          if (logs[habit.id]?.[dateStr]?.completed) {
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-          } else {
-            break;
-          }
-        }
+        const streak = habitRadarStorage.calculateStreak(habit.id, logs);
 
         return (
           <div
@@ -119,7 +97,7 @@ export const HabitRadarWeeklyView: React.FC<HabitRadarWeeklyViewProps> = ({
                   >
                     {habit.name}
                   </h3>
-                  {settings.showStreakOn.weekly && (
+                  {settings.showStreakOn.weekly && streak > 0 && (
                     <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-500 mt-0.5">
                       <Flame className="w-3 h-3 fill-amber-500" />
                       <span>{streak} {streak === 1 ? 'Day' : 'Days'}</span>
