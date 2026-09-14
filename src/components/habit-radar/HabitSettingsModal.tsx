@@ -113,11 +113,11 @@ export const HabitSettingsModal: React.FC<HabitSettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 pt-16 sm:pt-20 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
       {/* Backdrop click dismiss */}
       <div className="absolute inset-0 z-0 cursor-pointer" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-xl bg-[#0e111d] border-t sm:border border-white/10 rounded-t-[28px] sm:rounded-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.85)] sm:shadow-[0_25px_60px_rgba(0,0,0,0.9)] max-h-[85vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 ease-out">
+      <div className="relative z-10 w-full max-w-xl bg-[#0e111d] border-t sm:border border-white/10 rounded-t-[28px] sm:rounded-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.85)] sm:shadow-[0_25px_60px_rgba(0,0,0,0.9)] max-h-[82vh] sm:max-h-[80vh] my-auto flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 ease-out">
         
         {/* Top Handle on Mobile */}
         <div className="w-12 h-1.5 bg-white/20 hover:bg-white/30 rounded-full mx-auto my-2.5 sm:hidden flex-shrink-0 cursor-pointer" onClick={onClose} />
