@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
+import { useApp } from '../../context/AppContext';
 
 // Web Audio API Synthesizer for Storm Effects (no audio file dependencies)
 class StormAudioSynth {
@@ -160,6 +161,19 @@ interface BoneAIFABProps {
 }
 
 export const BoneAIFAB: React.FC<BoneAIFABProps> = ({ onClick, isOpen }) => {
+  const { currentRoute } = useApp();
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const hasBottomNav = isMobile && ['home', 'videos', 'tools'].includes(currentRoute);
+
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -347,13 +361,14 @@ export const BoneAIFAB: React.FC<BoneAIFABProps> = ({ onClick, isOpen }) => {
       style={{
         position: 'fixed',
         right: '24px',
-        bottom: '24px',
+        bottom: hasBottomNav ? '104px' : '24px',
         x,
         y,
         zIndex: 9999,
         cursor: 'grab',
         touchAction: 'none',
       }}
+      className="transition-[bottom] duration-300 ease-out"
       aria-label="Ask Bone AI"
       title="Ask Bone AI"
     >

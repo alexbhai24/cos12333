@@ -16,7 +16,8 @@ import {
   Layers,
   Cpu,
   CheckCircle2,
-  Flame
+  Flame,
+  Globe
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +31,13 @@ interface ToolCard {
 }
 
 const TOOLS: ToolCard[] = [
+  {
+    id: 'bone-ai',
+    title: 'Bone AI Assistant',
+    description: 'Interactive AI tutor for learning, study planning, and problem solving.',
+    icon: Cpu,
+    color: 'text-cyan-400',
+  },
   {
     id: 'habit-radar',
     title: 'Habit Radar',
@@ -129,6 +137,13 @@ const TOOLS: ToolCard[] = [
     icon: CheckCircle2,
     color: 'text-emerald-400',
   },
+  {
+    id: 'link',
+    title: 'Link',
+    description: 'Embedded web portal with speed tests, calculators, and online tools.',
+    icon: Globe,
+    color: 'text-cyan-400',
+  },
 ];
 
 export const ToolsPage: React.FC = () => {
@@ -152,9 +167,9 @@ export const ToolsPage: React.FC = () => {
     
     // Tools that go under /tools/...
     const toolsUnderToolsRoute = [
-      'habit-radar', 'mistake-tracker', 'syllabus-tracker', 'flashcards', 'sleep-cycle',
+      'bone-ai', 'habit-radar', 'mistake-tracker', 'syllabus-tracker', 'flashcards', 'sleep-cycle',
       'mock-tests', 'pyq', 'study-time-tracker', 'marks-calculator',
-      'exam-countdown', 'reading-practice', 'schedule-day'
+      'exam-countdown', 'reading-practice', 'schedule-day', 'link'
     ];
     
     if (tool.id === 'reading') {
@@ -177,7 +192,7 @@ export const ToolsPage: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 pt-4">
         {displayTools.map((tool) => {
           const Icon = tool.icon;
-          const isActive = ['habit-radar', 'reading', 'creator-studio', 'syllabus-tracker', 'flashcards', 'mistake-tracker', 'pyq', 'mock-tests', 'sleep-cycle', 'study-time-tracker', 'marks-calculator', 'exam-countdown', 'schedule-day'].includes(tool.id);
+          const isActive = ['bone-ai', 'habit-radar', 'reading', 'creator-studio', 'syllabus-tracker', 'flashcards', 'mistake-tracker', 'pyq', 'mock-tests', 'sleep-cycle', 'study-time-tracker', 'marks-calculator', 'exam-countdown', 'schedule-day', 'link'].includes(tool.id);
           return (
             <div
               key={tool.id}

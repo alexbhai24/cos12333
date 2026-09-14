@@ -115,6 +115,8 @@ const parsePathToRoute = (pathStr: string): PageRoute => {
   if (p.startsWith('tools/reading-practice')) return 'reading-practice';
   if (p.startsWith('tools/schedule-day')) return 'schedule-day';
   if (p.startsWith('tools/habit-radar') || p.startsWith('tools/habits') || p.startsWith('habit-radar')) return 'habit-radar';
+  if (p.startsWith('tools/bone-ai') || p === 'bone-ai') return 'bone-ai';
+  if (p.startsWith('tools/link') || p === 'link') return 'link';
 
   return p.split('/')[0] as PageRoute;
 };

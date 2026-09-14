@@ -211,6 +211,8 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
                 onAddMessage={handleAddMessage} 
                 onUpdateMessage={handleUpdateMessage}
                 currentRoute={currentRoute}
+                onNewChat={handleNewChat}
+                hideHeader={true}
               />
             ) : (
               <div className="h-full overflow-y-auto p-5 scrollbar-premium bg-[#040812]/95">

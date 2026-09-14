@@ -14,7 +14,6 @@ import {
   Briefcase,
   Cpu,
   Timer,
-  Globe,
   Wrench,
   Layers,
 } from 'lucide-react';
@@ -59,7 +58,6 @@ export const Sidebar: React.FC = () => {
     { id: 'games', label: 'Bone Games', icon: Gamepad2 },
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
     { id: 'focus-clock', label: 'Focus Clock', icon: Timer },
-    { id: 'link', label: 'Link', icon: Globe },
     { id: 'tools', label: 'Tools', icon: Wrench },
   ];
 

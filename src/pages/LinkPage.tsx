@@ -16,12 +16,8 @@ export const LinkPage: React.FC = () => {
     return unsub;
   }, [activeUrl]);
 
-
-
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] w-full bg-[#0b0e1b] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-
-
 
       {/* ── Embedded iframe ─────────────────────────────────────────────── */}
       <div className="flex-1 w-full h-full relative overflow-hidden bg-[#0d1117]">
@@ -34,7 +30,6 @@ export const LinkPage: React.FC = () => {
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
         />
       </div>
-
     </div>
   );
 };

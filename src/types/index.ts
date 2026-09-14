@@ -83,7 +83,8 @@ export type PageRoute =
   | 'reading-practice'
   | 'reading'
   | 'question-practice'
-  | 'habit-radar';
+  | 'habit-radar'
+  | 'bone-ai';
 
 export type StableGrade =
   | 'class_6'

@@ -20,11 +20,12 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
+export const BOTTOM_BAR_ROUTES: PageRoute[] = ['home', 'videos', 'tools'];
+
 const NAV_ITEMS: NavItem[] = [
-  { id: 'home',        label: 'Home',    icon: Home },
-  { id: 'videos',      label: 'Study',   icon: Video },
-  { id: 'tools',       label: 'Tools',   icon: Wrench },
-  { id: 'flashcards',  label: 'Cards',   icon: Layers },
+  { id: 'home',   label: 'Home',  icon: Home },
+  { id: 'videos', label: 'Video', icon: Video },
+  { id: 'tools',  label: 'Tools', icon: Wrench },
 ];
 
 // ── Quick Add‑Mistake Sheet ────────────────────────────────────────────────────
@@ -200,6 +201,10 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 export const MobileBottomNav: React.FC = () => {
   const { currentRoute, setCurrentRoute } = useApp();
   const [scannerOpen, setScannerOpen] = useState(false);
+
+  if (!BOTTOM_BAR_ROUTES.includes(currentRoute)) {
+    return null;
+  }
 
   const handleNav = (id: PageRoute) => {
     setCurrentRoute(id);

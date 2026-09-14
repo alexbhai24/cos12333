@@ -20,7 +20,7 @@ import { AppleShopDrawer } from './components/drawers/AppleShopDrawer';
 import { AdminConsoleModal } from './components/modals/AdminConsoleModal';
 import { SavedItemsModal } from './components/modals/SavedItemsModal';
 import { Bell, Loader2 } from 'lucide-react';
-import { MobileBottomNav } from './components/MobileBottomNav';
+import { MobileBottomNav, BOTTOM_BAR_ROUTES } from './components/MobileBottomNav';
 
 import { BoneAIFAB } from './components/bone-ai/BoneAIFAB';
 import { BoneAIPopup } from './components/bone-ai/BoneAIPopup';
@@ -56,8 +56,29 @@ import { ScheduleDayPage } from './pages/ScheduleDayPage';
 import { BiologyReadingPage } from './pages/BiologyReadingPage';
 import { QuestionPracticePage } from './pages/QuestionPracticePage';
 import { HabitRadarPage } from './pages/HabitRadarPage';
+import { BoneAIPage } from './pages/BoneAIPage';
 
 
+
+const SUB_TOOL_ROUTES = [
+  'bone-ai',
+  'syllabus-tracker',
+  'mistake-tracker',
+  'flashcards',
+  'habit-radar',
+  'pyq',
+  'mock-tests',
+  'test-instructions',
+  'nta-test',
+  'sleep-cycle',
+  'study-time-tracker',
+  'marks-calculator',
+  'exam-countdown',
+  'schedule-day',
+  'reading-practice',
+  'link',
+  'question-practice'
+];
 
 const AppContent: React.FC = () => {
   const {
@@ -192,6 +213,8 @@ const AppContent: React.FC = () => {
         return <QuestionPracticePage />;
       case 'habit-radar':
         return <HabitRadarPage />;
+      case 'bone-ai':
+        return <BoneAIPage />;
       case 'creator-studio': return userRole === 'admin' ? <CreatorPage /> : <AccessDeniedPage />;
       case 'admin-dashboard':
       case 'admin-users':
@@ -244,18 +267,24 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Top Bar */}
-      <TopBar />
+      <div className={currentRoute === 'bone-ai' ? 'hidden lg:block' : ''}>
+        <TopBar />
+      </div>
 
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
       <main
-        className={`relative z-10 pt-20 pb-28 lg:pb-12 px-4 sm:px-8 transition-[padding] duration-200 ease-out ${
+        className={`relative z-10 transition-[padding] duration-200 ease-out ${
+          currentRoute === 'bone-ai'
+            ? 'pt-0 lg:pt-20 pb-0 lg:pb-12 px-0 lg:px-8'
+            : 'pt-20 pb-28 lg:pb-12 px-4 sm:px-8'
+        } ${
           sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
         }`}
       >
-        <div className="max-w-[1366px] mx-auto">
+        <div className={currentRoute === 'bone-ai' ? 'w-full h-full' : 'max-w-[1366px] mx-auto'}>
           {/* key triggers smooth hardware-accelerated fade transition */}
           <div key={currentRoute} className="w-full h-full animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
             {renderRoute()}
@@ -263,8 +292,8 @@ const AppContent: React.FC = () => {
         </div>
       </main>
 
-      {/* Mobile floating bottom navigation */}
-      <MobileBottomNav />
+      {/* Mobile floating bottom navigation (Only on selected routes: home, videos, tools) */}
+      {BOTTOM_BAR_ROUTES.includes(currentRoute) && <MobileBottomNav />}
 
       {/* Modals */}
       <SearchModal />
@@ -279,8 +308,8 @@ const AppContent: React.FC = () => {
       <AppleShopDrawer />
       <AdminConsoleModal />
 
-      {/* Bone AI */}
-      {isBoneAIEnabled && (
+      {/* Bone AI Floating Assistant (Hidden inside specific tools like bone-ai, syllabus-tracker, etc.) */}
+      {isBoneAIEnabled && !SUB_TOOL_ROUTES.includes(currentRoute) && (
         <>
           <BoneAIFAB isOpen={isBoneAIOpen} onClick={() => setIsBoneAIOpen(!isBoneAIOpen)} />
           <BoneAIPopup isOpen={isBoneAIOpen} onClose={() => setIsBoneAIOpen(false)} />

@@ -8,7 +8,9 @@ export interface ChatMessage {
   timestamp: number;
   mode?: string;
   image?: string; // base64
-  citations?: { title: string; url: string }[];
+  webImages?: string[]; // array of web image URLs
+  citations?: { title: string; url: string; snippet?: string; domain?: string }[];
+  followUpSuggestions?: string[];
 }
 
 export interface ChatSession {

@@ -1229,3 +1229,92 @@ body.focus-idle .fixed.bottom-4.right-4 {
 .flashcard-face-back {
   transform: rotateY(180deg);
 }
+
+/* ─── Bone AI Bixby-Inspired Interaction States ─────────────────────────── */
+
+/* 1. Listening Breathing Glow */
+@keyframes boneAiListeningGlow {
+  0%, 100% {
+    box-shadow: 
+      8px 8px 22px -2px rgba(0, 240, 255, 0.45),
+      0 4px 14px rgba(0, 212, 232, 0.3),
+      -6px -5px 18px -2px rgba(180, 80, 255, 0.35);
+    border-color: rgba(0, 240, 255, 0.55);
+  }
+  50% {
+    box-shadow: 
+      12px 12px 28px 0px rgba(0, 240, 255, 0.6),
+      0 6px 18px rgba(0, 212, 232, 0.4),
+      -9px -7px 22px 0px rgba(220, 80, 255, 0.48);
+    border-color: rgba(0, 240, 255, 0.85);
+  }
+}
+
+.bone-ai-listening-glow {
+  animation: boneAiListeningGlow 2.5s ease-in-out infinite;
+}
+
+/* 2. Audio Equalizer Waveform */
+@keyframes boneAiEqualizerBar {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 14px;
+  }
+}
+
+.bone-ai-eq-bar-1 {
+  animation: boneAiEqualizerBar 0.9s ease-in-out infinite 0s;
+}
+
+.bone-ai-eq-bar-2 {
+  animation: boneAiEqualizerBar 0.9s ease-in-out infinite 0.2s;
+}
+
+.bone-ai-eq-bar-3 {
+  animation: boneAiEqualizerBar 0.9s ease-in-out infinite 0.4s;
+}
+
+.bone-ai-eq-bar-4 {
+  animation: boneAiEqualizerBar 0.9s ease-in-out infinite 0.1s;
+}
+
+/* 3. Thinking / Generating Shimmer Ring */
+@keyframes boneAiThinkingRing {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    border-color: rgba(0, 240, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    border-color: rgba(0, 240, 255, 0.65);
+  }
+}
+
+.bone-ai-thinking-ring {
+  animation: boneAiThinkingRing 2s ease-in-out infinite;
+}
+
+/* 4. Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .bone-ai-listening-glow {
+    animation: none !important;
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.4), -4px -4px 12px rgba(180, 80, 255, 0.3) !important;
+    border-color: rgba(0, 240, 255, 0.6) !important;
+  }
+
+  .bone-ai-eq-bar-1,
+  .bone-ai-eq-bar-2,
+  .bone-ai-eq-bar-3,
+  .bone-ai-eq-bar-4 {
+    animation: none !important;
+    height: 10px !important;
+  }
+
+  .bone-ai-thinking-ring {
+    animation: none !important;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.2) !important;
+    border-color: rgba(0, 240, 255, 0.4) !important;
+  }
+}
