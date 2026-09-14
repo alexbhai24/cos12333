@@ -11,10 +11,13 @@ import {
   Trash2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import type { Post } from '../types';
 
 export const PostsPage: React.FC = () => {
+  const { currentUser } = useAuth();
   const {
+    user,
     posts,
     addPost,
     deletePost,
@@ -347,18 +350,34 @@ export const PostsPage: React.FC = () => {
                       <Share2 className="w-3.5 h-3.5" />
                     </button>
 
-                    {/* Delete Post */}
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Delete this post?')) {
-                          deletePost(post.id);
-                        }
-                      }}
-                      className="p-2 rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-rose-400 hover:border-rose-500/40 hover:bg-rose-500/10 transition-colors"
-                      title="Delete post"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Delete Post (Only author who created the post can delete it) */}
+                    {(() => {
+                      const currentUid = currentUser?.uid;
+                      const currentEmail = (currentUser?.email || user?.email)?.toLowerCase().trim();
+                      const currentName = (currentUser?.displayName || user?.name || user?.displayName)?.toLowerCase().trim();
+                      const postAuthorId = post.authorId?.toLowerCase().trim();
+                      const postAuthorName = post.authorName?.toLowerCase().trim();
+
+                      const isAuthor = Boolean(
+                        (currentUid && postAuthorId === currentUid) ||
+                        (currentEmail && postAuthorId === currentEmail) ||
+                        (currentName && postAuthorName === currentName)
+                      );
+                      if (!isAuthor) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Delete this post?')) {
+                              deletePost(post.id);
+                            }
+                          }}
+                          className="p-2 rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-rose-400 hover:border-rose-500/40 hover:bg-rose-500/10 transition-colors"
+                          title="Delete post"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
 

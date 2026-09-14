@@ -3,7 +3,7 @@ import {
   X, Search, Droplets, Moon, Heart, Activity, Flame, Dumbbell,
   Footprints, Bike, Trophy, Award, Book, BookOpen, GraduationCap,
   Pencil, Clock, Sunrise, Star, Coffee, Bed, Sparkles, Smile,
-  Briefcase, Laptop, Target, CheckCircle2, Apple, Zap, Music
+  Briefcase, Laptop, Target, CheckCircle2, Apple, Zap, Music, Utensils, Brain, ShieldAlert
 } from 'lucide-react';
 
 interface IconPickerModalProps {
@@ -22,6 +22,10 @@ export const LUCIDE_ICONS_MAP: Record<string, React.ComponentType<{ className?: 
   bed: Bed,
   coffee: Coffee,
   sunrise: Sunrise,
+  utensils: Utensils,
+  brain: Brain,
+  'shield-alert': ShieldAlert,
+  shieldAlert: ShieldAlert,
   // Fitness
   dumbbell: Dumbbell,
   footprints: Footprints,

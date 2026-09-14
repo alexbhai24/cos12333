@@ -1,4 +1,5 @@
 import { Habit, HabitLogs, HabitSettings, DEFAULT_HABITS, DEFAULT_SETTINGS, DayLog } from '../types/habitRadar';
+import { auth } from '../firebase';
 
 const STORAGE_KEYS = {
   HABITS: 'cosmic_habit_radar_habits_v1',
@@ -6,6 +7,27 @@ const STORAGE_KEYS = {
   SETTINGS: 'cosmic_habit_radar_settings_v1',
   ONBOARDING: 'cosmic_habit_radar_onboarding_v1',
 };
+
+// Returns user-scoped storage key so logging out / switching accounts isolates habits cleanly
+function getScopedKey(baseKey: string): string {
+  try {
+    const user = auth.currentUser;
+    const identifier = user?.uid || user?.email || 'guest';
+    const sanitized = identifier.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const scopedKey = `${baseKey}_${sanitized}`;
+
+    // If scoped key has no data yet, but un-scoped legacy baseKey exists, migrate it once
+    if (user && typeof window !== 'undefined' && localStorage.getItem(scopedKey) === null) {
+      const legacyVal = localStorage.getItem(baseKey);
+      if (legacyVal !== null) {
+        localStorage.setItem(scopedKey, legacyVal);
+      }
+    }
+    return scopedKey;
+  } catch {
+    return baseKey;
+  }
+}
 
 // Date helper: returns 'YYYY-MM-DD'
 export function formatDateKey(d: Date = new Date()): string {
@@ -40,7 +62,8 @@ export function playSoftTickSound(enabled = true, isCompletion = false) {
 export const habitRadarStorage = {
   getHabits(): Habit[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.HABITS);
+      const key = getScopedKey(STORAGE_KEYS.HABITS);
+      const stored = localStorage.getItem(key);
       if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
@@ -56,7 +79,8 @@ export const habitRadarStorage = {
     try {
       const habits = this.getHabits();
       if (habits.length > 0) return true;
-      const val = localStorage.getItem(STORAGE_KEYS.ONBOARDING);
+      const key = getScopedKey(STORAGE_KEYS.ONBOARDING);
+      const val = localStorage.getItem(key);
       return val === 'true';
     } catch {
       return false;
@@ -65,7 +89,8 @@ export const habitRadarStorage = {
 
   setOnboardingCompleted(completed = true) {
     try {
-      localStorage.setItem(STORAGE_KEYS.ONBOARDING, completed ? 'true' : 'false');
+      const key = getScopedKey(STORAGE_KEYS.ONBOARDING);
+      localStorage.setItem(key, completed ? 'true' : 'false');
     } catch (e) {
       console.error('Failed to save onboarding status:', e);
     }
@@ -73,7 +98,8 @@ export const habitRadarStorage = {
 
   saveHabits(habits: Habit[]) {
     try {
-      localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(habits));
+      const key = getScopedKey(STORAGE_KEYS.HABITS);
+      localStorage.setItem(key, JSON.stringify(habits));
     } catch (e) {
       console.error('Failed to save habits:', e);
     }
@@ -81,7 +107,8 @@ export const habitRadarStorage = {
 
   getLogs(): HabitLogs {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.LOGS);
+      const key = getScopedKey(STORAGE_KEYS.LOGS);
+      const stored = localStorage.getItem(key);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -91,7 +118,8 @@ export const habitRadarStorage = {
 
   saveLogs(logs: HabitLogs) {
     try {
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
+      const key = getScopedKey(STORAGE_KEYS.LOGS);
+      localStorage.setItem(key, JSON.stringify(logs));
     } catch (e) {
       console.error('Failed to save habit logs:', e);
     }
@@ -99,7 +127,8 @@ export const habitRadarStorage = {
 
   getSettings(): HabitSettings {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      const key = getScopedKey(STORAGE_KEYS.SETTINGS);
+      const stored = localStorage.getItem(key);
       if (stored) {
         return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
@@ -109,35 +138,11 @@ export const habitRadarStorage = {
 
   saveSettings(settings: HabitSettings) {
     try {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+      const key = getScopedKey(STORAGE_KEYS.SETTINGS);
+      localStorage.setItem(key, JSON.stringify(settings));
     } catch (e) {
       console.error('Failed to save habit settings:', e);
     }
-  },
-
-  // Seed recent completions so the weekly and monthly grids look alive on first load
-  seedInitialLogs() {
-    const today = new Date();
-    const logs: HabitLogs = {};
-
-    const habitsToSeed = [
-      { id: 'habit_1', daysBack: [0, 1] },
-      { id: 'habit_2', daysBack: [0, 1] },
-      { id: 'habit_4', daysBack: [0, 1, 3] },
-      { id: 'habit_5', daysBack: [0, 2] },
-      { id: 'habit_7', daysBack: [0, 1] },
-    ];
-
-    habitsToSeed.forEach(({ id, daysBack }) => {
-      logs[id] = {};
-      daysBack.forEach(offset => {
-        const d = new Date(today);
-        d.setDate(d.getDate() - offset);
-        logs[id][formatDateKey(d)] = { completed: true, count: 1 };
-      });
-    });
-
-    this.saveLogs(logs);
   },
 
   // Toggle habit for a given date
@@ -239,12 +244,19 @@ export const habitRadarStorage = {
   importBackup(jsonData: string): { success: boolean; error?: string } {
     try {
       const parsed = JSON.parse(jsonData);
+      if (Array.isArray(parsed)) {
+        this.saveHabits(parsed);
+        this.saveLogs({});
+        return { success: true };
+      }
       if (parsed && typeof parsed === 'object') {
         if (Array.isArray(parsed.habits)) {
           this.saveHabits(parsed.habits);
         }
         if (parsed.logs && typeof parsed.logs === 'object') {
           this.saveLogs(parsed.logs);
+        } else {
+          this.saveLogs({});
         }
         if (parsed.settings && typeof parsed.settings === 'object') {
           this.saveSettings({ ...DEFAULT_SETTINGS, ...parsed.settings });
@@ -260,19 +272,21 @@ export const habitRadarStorage = {
   // Clear all habits and progress
   clearAllData() {
     try {
-      localStorage.removeItem(STORAGE_KEYS.HABITS);
-      localStorage.removeItem(STORAGE_KEYS.LOGS);
-      localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify({}));
+      const hKey = getScopedKey(STORAGE_KEYS.HABITS);
+      const lKey = getScopedKey(STORAGE_KEYS.LOGS);
+      localStorage.removeItem(hKey);
+      localStorage.removeItem(lKey);
+      localStorage.setItem(hKey, JSON.stringify([]));
+      localStorage.setItem(lKey, JSON.stringify({}));
     } catch (e) {
       console.error('Failed to clear data:', e);
     }
   },
 
-  // Restore default pre-existing sample habits
+  // Restore default starter habits with zero unticked streaks
   restoreDefaultHabits() {
     this.saveHabits(DEFAULT_HABITS);
-    this.seedInitialLogs();
+    this.saveLogs({});
     return DEFAULT_HABITS;
   },
 };

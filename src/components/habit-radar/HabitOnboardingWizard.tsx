@@ -243,34 +243,36 @@ export const HabitOnboardingWizard: React.FC<HabitOnboardingWizardProps> = ({ on
                   <div
                     key={preset.id}
                     onClick={() => togglePreset(preset.id)}
-                    className={`w-full py-3.5 px-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-center gap-3 text-center ${
+                    className={`w-full py-3 px-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                       isSelected
-                        ? 'bg-[#1a233b] border-blue-500/80 text-white font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                        : 'bg-[#1a1d2c] border-white/5 hover:border-white/15 text-slate-200 font-semibold'
+                        ? 'bg-[#1a233b] border-blue-500/80 text-white font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] scale-[1.01]'
+                        : 'bg-[#1a1d2c] border-white/5 hover:border-white/15 text-slate-200 font-semibold hover:bg-[#1f2336]'
                     }`}
                   >
-                    {/* Icon */}
-                    <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: `${preset.color}25` }}
-                    >
-                      {preset.icon === 'moon' && <Moon className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'utensils' && <Utensils className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'droplets' && <Droplets className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'dumbbell' && <Dumbbell className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'footprints' && <Footprints className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'brain' && <Brain className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'zap' && <Zap className="w-4 h-4" style={{ color: preset.color }} />}
-                      {preset.icon === 'shield-alert' && <ShieldAlert className="w-4 h-4" style={{ color: preset.color }} />}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Icon */}
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border border-white/10"
+                        style={{ backgroundColor: `${preset.color}25` }}
+                      >
+                        {preset.icon === 'moon' && <Moon className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'utensils' && <Utensils className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'droplets' && <Droplets className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'dumbbell' && <Dumbbell className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'footprints' && <Footprints className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'brain' && <Brain className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'zap' && <Zap className="w-4 h-4" style={{ color: preset.color }} />}
+                        {preset.icon === 'shield-alert' && <ShieldAlert className="w-4 h-4" style={{ color: preset.color }} />}
+                      </div>
+
+                      <span className="text-sm font-semibold text-white truncate text-left">{preset.name}</span>
                     </div>
 
-                    <span className="text-sm">{preset.name}</span>
-
-                    {isSelected && (
-                      <div className="ml-auto w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0">
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      </div>
-                    )}
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                      isSelected ? 'bg-blue-500 text-white' : 'border border-white/20 text-transparent'
+                    }`}>
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
                   </div>
                 );
               })}
