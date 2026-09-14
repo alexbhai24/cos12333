@@ -115,12 +115,32 @@ export const habitRadarStorage = {
     }
   },
 
-  // Seed initial logs (no-op to prevent fake streak logs)
+  // Seed recent completions so the weekly and monthly grids look alive on first load
   seedInitialLogs() {
-    // No mock seeding — real user data only
+    const today = new Date();
+    const logs: HabitLogs = {};
+
+    const habitsToSeed = [
+      { id: 'habit_1', daysBack: [0, 1] },
+      { id: 'habit_2', daysBack: [0, 1] },
+      { id: 'habit_4', daysBack: [0, 1, 3] },
+      { id: 'habit_5', daysBack: [0, 2] },
+      { id: 'habit_7', daysBack: [0, 1] },
+    ];
+
+    habitsToSeed.forEach(({ id, daysBack }) => {
+      logs[id] = {};
+      daysBack.forEach(offset => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - offset);
+        logs[id][formatDateKey(d)] = { completed: true, count: 1 };
+      });
+    });
+
+    this.saveLogs(logs);
   },
 
-  // Toggle habit for a given date (Single Click Completion)
+  // Toggle habit for a given date
   toggleHabitDay(habitId: string, dateStr: string, soundEnabled = true): HabitLogs {
     const logs = this.getLogs();
     const habitLogs = logs[habitId] || {};
@@ -129,28 +149,26 @@ export const habitRadarStorage = {
     const habits = this.getHabits();
     const habit = habits.find(h => h.id === habitId);
 
-    const isCurrentlyCompleted = !!current?.completed;
-    const nextCompleted = !isCurrentlyCompleted;
-
     let nextLog: DayLog;
     if (habit?.trackType === 'amount') {
       const target = habit.targetAmount || 1;
-      nextLog = {
-        completed: nextCompleted,
-        count: nextCompleted ? target : 0,
-      };
-    } else if (habit?.trackType === 'time') {
-      const targetSecs = (habit.targetMinutes || 15) * 60;
-      nextLog = {
-        completed: nextCompleted,
-        elapsedSeconds: nextCompleted ? targetSecs : 0,
-      };
+      const currentCount = current?.count || 0;
+      if (current?.completed || currentCount >= target) {
+        nextLog = { completed: false, count: 0 };
+      } else {
+        // Single click completion for targets > 10 (e.g., 5000 steps), step increment for smaller targets <= 10
+        const newCount = target > 10 ? target : currentCount + 1;
+        nextLog = { completed: newCount >= target, count: newCount };
+      }
     } else {
-      nextLog = { completed: nextCompleted };
+      const isCompleted = !(current?.completed);
+      nextLog = { completed: isCompleted };
     }
 
-    if (nextCompleted) {
+    if (nextLog.completed) {
       playSoftTickSound(soundEnabled, true);
+    } else if (habit?.trackType === 'amount' && nextLog.count && nextLog.count > 0) {
+      playSoftTickSound(soundEnabled, false);
     }
 
     logs[habitId] = {

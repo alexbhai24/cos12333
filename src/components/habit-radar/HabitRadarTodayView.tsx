@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  Check, Play, Flame, MoreVertical, Edit3
+  Check, Plus, Play, Flame, MoreVertical, Edit3
 } from 'lucide-react';
 import { Habit, HabitLogs, HabitSettings } from '../../types/habitRadar';
 import { LUCIDE_ICONS_MAP } from './IconPickerModal';
-import { formatDateKey, habitRadarStorage } from '../../utils/habitRadarStorage';
+import { formatDateKey } from '../../utils/habitRadarStorage';
 
 interface HabitRadarTodayViewProps {
   habits: Habit[];
@@ -42,12 +42,45 @@ export const HabitRadarTodayView: React.FC<HabitRadarTodayViewProps> = ({
   const isCompact = settings.cardDensity === 'compact';
 
   return (
-    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-3 pb-28`}>
+    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-3 pb-24`}>
       {habits.map(habit => {
         const habitLog = logs[habit.id]?.[todayStr];
         const isCompleted = habitLog?.completed ?? false;
+        const currentCount = habitLog?.count ?? 0;
+        const targetAmount = habit.targetAmount || 1;
         const IconComp = LUCIDE_ICONS_MAP[habit.icon];
-        const streak = habitRadarStorage.calculateStreak(habit.id, logs);
+
+        // Format time for timer tasks (assuming currentCount is in seconds)
+        const formatTime = (secs: number) => {
+          const m = Math.floor(secs / 60);
+          const s = secs % 60;
+          return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+        const currentFormattedTime = formatTime(currentCount);
+        const targetFormattedTime = `${String(habit.targetMinutes || 15).padStart(2, '0')}:00`;
+
+        // Calculate streak
+        let streak = 0;
+        const checkDate = new Date();
+        const checkTodayStr = formatDateKey(checkDate);
+        if (logs[habit.id]?.[checkTodayStr]?.completed) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          checkDate.setDate(checkDate.getDate() - 1);
+          if (!logs[habit.id]?.[formatDateKey(checkDate)]?.completed) {
+            streak = 0;
+          }
+        }
+        while (streak > 0) {
+          const dateStr = formatDateKey(checkDate);
+          if (logs[habit.id]?.[dateStr]?.completed) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else {
+            break;
+          }
+        }
 
         return (
           <div
@@ -86,50 +119,94 @@ export const HabitRadarTodayView: React.FC<HabitRadarTodayViewProps> = ({
                   </h3>
                 </div>
 
-                <div className="flex items-center gap-2 mt-0.5">
-                  {settings.showStreakOn.today && streak > 0 && (
-                    <div className="flex items-center gap-1 text-xs font-semibold text-amber-500">
-                      <Flame className="w-3.5 h-3.5 fill-amber-500" />
-                      <span>{streak} {streak === 1 ? 'Day' : 'Days'}</span>
-                    </div>
-                  )}
-
-                  {habit.trackType === 'amount' && habit.targetAmount && (
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      Target: {habit.targetAmount} {habit.unit || ''}
-                    </span>
-                  )}
-                  {habit.trackType === 'time' && habit.targetMinutes && (
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      Target: {habit.targetMinutes}m
-                    </span>
-                  )}
-                </div>
+                {settings.showStreakOn.today && (
+                  <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-amber-500">
+                    <Flame className="w-3.5 h-3.5 fill-amber-500" />
+                    <span>{streak} {streak === 1 ? 'Day' : 'Days'}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Right: Single Tap Action Button */}
-            <div className="flex flex-col items-center justify-center shrink-0 ml-4">
-              <button
-                onClick={() => onToggleDay(habit.id, todayStr)}
-                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
-                  isCompleted
-                    ? 'shadow-[0_0_15px_rgba(0,0,0,0.3)] scale-105'
-                    : 'border-[1.5px] border-white/20 hover:border-white/40 text-transparent hover:text-white/20'
-                }`}
-                style={{
-                  backgroundColor: isCompleted ? habit.color : 'transparent',
-                  color: isCompleted ? '#111' : undefined,
-                  borderColor: isCompleted ? habit.color : undefined,
-                }}
-                title={isCompleted ? 'Mark incomplete' : 'Mark completed'}
-              >
-                {isCompleted ? (
-                  <Check className="w-5 h-5 stroke-[2.5]" />
-                ) : (
-                  <Check className="w-5 h-5 opacity-0 group-hover:opacity-40" />
-                )}
-              </button>
+            {/* Right: Actions */}
+            <div className="flex flex-col items-center gap-1.5 shrink-0 ml-4 w-[85px]">
+              {/* Task Type: Simple Checkbox Circle */}
+              {habit.trackType === 'task' && (
+                <button
+                  onClick={() => onToggleDay(habit.id, todayStr)}
+                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                    isCompleted
+                      ? 'shadow-[0_0_15px_rgba(0,0,0,0.3)] scale-105'
+                      : 'border-[1.5px] border-white/20 hover:border-white/40 text-transparent hover:text-white/20'
+                  }`}
+                  style={{
+                    backgroundColor: isCompleted ? habit.color : 'transparent',
+                    color: isCompleted ? '#111' : undefined,
+                    borderColor: isCompleted ? habit.color : undefined,
+                  }}
+                  title={isCompleted ? 'Mark incomplete' : 'Mark completed'}
+                >
+                  {isCompleted && <Check className="w-5 h-5 stroke-[2.5]" />}
+                </button>
+              )}
+
+              {/* Amount Type: Counter Stepper (+ Button) */}
+              {habit.trackType === 'amount' && (
+                <>
+                  <button
+                    onClick={() => onToggleDay(habit.id, todayStr)}
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                      isCompleted
+                        ? 'shadow-[0_0_15px_rgba(0,0,0,0.3)] scale-105'
+                        : 'border-[1px] border-white/20 hover:border-white/40 text-white/50 hover:text-white/80'
+                    }`}
+                    style={{
+                      backgroundColor: isCompleted ? habit.color : 'transparent',
+                      color: isCompleted ? '#111' : undefined,
+                      borderColor: isCompleted ? habit.color : undefined,
+                    }}
+                    title="Tap to increment"
+                  >
+                    {isCompleted ? (
+                      <Check className="w-5 h-5 stroke-[2.5]" />
+                    ) : (
+                      <Plus className="w-5 h-5 stroke-[1.5]" />
+                    )}
+                  </button>
+                  <span className="text-[9px] sm:text-[10px] font-medium text-white/40 whitespace-nowrap text-center">
+                    {currentCount} / {targetAmount} times
+                  </span>
+                </>
+              )}
+
+              {/* Time Type: Timer Trigger Button */}
+              {habit.trackType === 'time' && (
+                <>
+                  <button
+                    onClick={() => onOpenTimer(habit)}
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                      isCompleted
+                        ? 'shadow-[0_0_15px_rgba(0,0,0,0.3)] scale-105'
+                        : 'border-[1px] border-white/20 hover:border-white/40 text-white/50 hover:text-white/80'
+                    }`}
+                    style={{
+                      backgroundColor: isCompleted ? habit.color : 'transparent',
+                      color: isCompleted ? '#111' : undefined,
+                      borderColor: isCompleted ? habit.color : undefined,
+                    }}
+                    title="Launch focus timer"
+                  >
+                    {isCompleted ? (
+                      <Check className="w-5 h-5 stroke-[2.5]" />
+                    ) : (
+                      <Play className="w-4 h-4 fill-current ml-0.5" />
+                    )}
+                  </button>
+                  <span className="text-[9px] sm:text-[10px] font-medium text-white/40 whitespace-nowrap text-center">
+                    {currentFormattedTime} / {targetFormattedTime}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         );

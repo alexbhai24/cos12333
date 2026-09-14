@@ -17,16 +17,16 @@ const DEFAULT_PROFILE: UserProfile = {
   gradeLevel: 'pcb' as any, // default to PCB
   teacherDesignation: '' as any,
   apples: 100,
-  streak: 3,
-  streakFreezes: 1,
+  streak: 0,
+  streakFreezes: 0,
   photoUrl: 'gradient:astronaut',
   decoration: 'none',
   isAdmin: false,
   setupComplete: false,
   gender: 'male',
   savedItemIds: [],
-  streakHistory: ['2026-07-28', '2026-07-27', '2026-07-25', '2026-07-24'],
-  frozenDates: ['2026-07-26'],
+  streakHistory: [],
+  frozenDates: [],
 };
 
 const getProfileKey = () => {

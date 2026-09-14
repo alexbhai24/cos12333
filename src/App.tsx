@@ -152,7 +152,7 @@ const AppContent: React.FC = () => {
   }
 
   // 4. Signed in but profile setup not completed
-  if (currentUser && userProfile && userProfile.setupComplete === false) {
+  if (currentUser && !user.setupComplete && userProfile && userProfile.setupComplete === false) {
     return <ProfileSetupModal />;
   }
 
