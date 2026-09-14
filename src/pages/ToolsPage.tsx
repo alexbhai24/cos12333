@@ -14,7 +14,9 @@ import {
   Moon,
   FileQuestion,
   Layers,
-  Cpu
+  Cpu,
+  CheckCircle2,
+  Flame
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +30,13 @@ interface ToolCard {
 }
 
 const TOOLS: ToolCard[] = [
+  {
+    id: 'habit-radar',
+    title: 'Habit Radar',
+    description: 'Track daily habits, streaks, weekly grids, and monthly heatmaps.',
+    icon: Flame,
+    color: 'text-emerald-400',
+  },
   {
     id: 'reading',
     title: 'Reading Speed & Focus',
@@ -113,6 +122,13 @@ const TOOLS: ToolCard[] = [
     icon: Layers,
     color: 'text-amber-400',
   },
+  {
+    id: 'question-practice',
+    title: 'Question Practice',
+    description: 'Chapter-wise NCERT question bank with detailed solutions.',
+    icon: CheckCircle2,
+    color: 'text-emerald-400',
+  },
 ];
 
 export const ToolsPage: React.FC = () => {
@@ -125,50 +141,32 @@ export const ToolsPage: React.FC = () => {
   const displayTools = TOOLS;
 
   const handleToolClick = (tool: ToolCard) => {
+    if (tool.id === 'question-practice') {
+      setCurrentRoute('question-practice'); // Top level
+      return;
+    }
     if (tool.id === 'creator-studio') {
-      setCurrentRoute('creator-studio');
+      setCurrentRoute('creator-studio'); // Top level
       return;
     }
-    if (tool.id === 'mistake-tracker') {
-      setCurrentRoute('mistake-tracker');
+    
+    // Tools that go under /tools/...
+    const toolsUnderToolsRoute = [
+      'habit-radar', 'mistake-tracker', 'syllabus-tracker', 'flashcards', 'sleep-cycle',
+      'mock-tests', 'pyq', 'study-time-tracker', 'marks-calculator',
+      'exam-countdown', 'reading-practice', 'schedule-day'
+    ];
+    
+    if (tool.id === 'reading') {
+      setCurrentRoute('reading-practice', '', '/tools/reading-practice');
       return;
     }
-    if (tool.id === 'syllabus-tracker') {
-      setCurrentRoute('syllabus-tracker');
+    
+    if (toolsUnderToolsRoute.includes(tool.id)) {
+      setCurrentRoute(tool.id as any, '', `/tools/${tool.id}`);
       return;
     }
-    if (tool.id === 'flashcards') {
-      setCurrentRoute('flashcards');
-      return;
-    }
-    if (tool.id === 'sleep-cycle') {
-      setCurrentRoute('sleep-cycle');
-      return;
-    }
-    if (tool.id === 'mock-tests') {
-      setCurrentRoute('mock-tests');
-      return;
-    }
-    if (tool.id === 'pyq') {
-      setCurrentRoute('pyq');
-      return;
-    }
-    if (tool.id === 'study-time-tracker') {
-      setCurrentRoute('study-time-tracker');
-      return;
-    }
-    if (tool.id === 'marks-calculator') {
-      setCurrentRoute('marks-calculator');
-      return;
-    }
-    if (tool.id === 'exam-countdown') {
-      setCurrentRoute('exam-countdown');
-      return;
-    }
-    if (tool.id === 'schedule-day') {
-      setCurrentRoute('schedule-day');
-      return;
-    }
+    
     // For now, we just show a coming soon toast
     showNotification(`${tool.title} is coming soon!`);
   };
@@ -179,7 +177,7 @@ export const ToolsPage: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 pt-4">
         {displayTools.map((tool) => {
           const Icon = tool.icon;
-          const isActive = ['creator-studio', 'syllabus-tracker', 'flashcards', 'mistake-tracker', 'pyq', 'mock-tests', 'sleep-cycle', 'study-time-tracker', 'marks-calculator', 'exam-countdown', 'schedule-day'].includes(tool.id);
+          const isActive = ['habit-radar', 'reading', 'creator-studio', 'syllabus-tracker', 'flashcards', 'mistake-tracker', 'pyq', 'mock-tests', 'sleep-cycle', 'study-time-tracker', 'marks-calculator', 'exam-countdown', 'schedule-day'].includes(tool.id);
           return (
             <div
               key={tool.id}

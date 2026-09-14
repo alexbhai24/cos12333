@@ -1,14 +1,22 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Search, Filter, ChevronDown, Check, X, Image as ImageIcon,
   Trash2, Edit3, Eye, BookOpen, Layers, FileQuestion, Cpu,
   BarChart3, ArrowLeft, Flame, Atom, Clock, Award, Copy,
-  CheckCircle2, AlertCircle, Tag, SlidersHorizontal, Upload
+  CheckCircle2, AlertCircle, Tag, SlidersHorizontal, Upload,
+  Sparkles, LayoutGrid, List, RotateCcw, Play, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { syllabusNEET } from '../data/syllabusNEET';
 import { syllabusJEE }  from '../data/syllabusJEE';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
+import { getChapterUnitTheme } from '../utils/flashcardUnitTheme';
+import { CsvUploader } from '../components/creator-studio/CsvUploader';
+import { TestBuilderModal } from '../components/creator-studio/TestBuilderModal';
+import { useCreatorStudioStorage } from '../hooks/useCreatorStudioStorage';
+import { CustomTest } from '../types/creatorStudio';
+import { QuestionSolutionTabs } from '../components/QuestionSolutionTabs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,10 +25,10 @@ type QType      = 'mcq' | 'image' | 'match' | 'assertion' | 'statement' | 'graph
 type Difficulty = 'easy' | 'medium' | 'hard';
 type QSource    = 'pyq' | 'daily-practice' | 'question-practice' | 'mock-test' | 'chapter-test';
 
-interface QuestionOption { text: string; imageUrl?: string; }
-interface MatchMapping { left: string; right: string; }
+export interface QuestionOption { text: string; imageUrl?: string; }
+export interface MatchMapping { left: string; right: string; }
 
-interface Question {
+export interface Question {
   id: string;
   exam: ExamType;
   subjectId: string;
@@ -51,7 +59,9 @@ interface Question {
   matchMappings?: [MatchMapping, MatchMapping, MatchMapping, MatchMapping];
 
   explanation: string;
+  solutionExplanation?: string;
   videoSolution?: string;
+  videoSolutionUrl?: string;
   createdAt: string;
   status: 'draft' | 'published';
 }
@@ -123,7 +133,7 @@ const blankForm = (): Omit<Question,'id'|'createdAt'|'status'> => ({
   statementA: '', statementB: '',
   matchLeft: ['','','',''], matchRight: ['','','',''],
   matchMappings: [{left:'A',right:'P'},{left:'B',right:'Q'},{left:'C',right:'R'},{left:'D',right:'S'}],
-  explanation: '', videoSolution: '',
+  explanation: '', solutionExplanation: '', videoSolution: '', videoSolutionUrl: '',
 });
 
 // Convert file to Base64 (with compression) to bypass Storage permission issues
@@ -341,7 +351,7 @@ const QuestionForm: React.FC<{
     if (!form.chapterId)    errs.push('Chapter is required');
     if (!form.topicId)      errs.push('Topic is required');
     if (!form.questionText.trim() && !form.questionImageUrl) errs.push('Question text or image is required');
-    if (!form.explanation.trim()) errs.push('Explanation is required');
+    if (!form.explanation.trim() && !form.solutionExplanation?.trim()) errs.push('Explanation is required');
 
     if (form.qType === 'mcq' || form.qType === 'image' || form.qType === 'graphical') {
       const filledOpts = form.options.filter(o => o.text.trim() || o.imageUrl);
@@ -634,31 +644,42 @@ const QuestionForm: React.FC<{
           {/* Dynamic Fields (Options / Match / Statement) */}
           {renderDynamicFields()}
 
-          {/* Explanation */}
-          <div className="rounded-2xl p-5 space-y-3"
+          {/* Explanation & Video Solution */}
+          <div className="rounded-2xl p-5 space-y-4"
             style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <h3 className="text-sm font-black text-white">Explanation <span className="text-red-400">*</span></h3>
-            <textarea
-              value={form.explanation}
-              onChange={e => set('explanation', e.target.value)}
-              placeholder="Explain why the correct answer is right (min 10 characters)…"
-              rows={4}
-              className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder:text-white/20 outline-none resize-none"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-300 mb-1.5 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-400" />
+                Solution / Explanation (Optional) <span className="text-red-400">*</span>
+              </label>
+              <textarea
+                value={form.solutionExplanation || form.explanation || ''}
+                onChange={e => {
+                  set('solutionExplanation', e.target.value);
+                  set('explanation', e.target.value);
+                }}
+                placeholder="Explain why the correct answer is right (min 10 characters)…"
+                rows={4}
+                className="w-full bg-[#181a25] border border-white/10 rounded-xl p-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-cyan-400/50 min-h-[100px] transition-colors resize-none"
+              />
+            </div>
 
-          {/* Video Solution */}
-          <div className="rounded-2xl p-5 space-y-3"
-            style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <h3 className="text-sm font-black text-white">Video Solution <span className="text-white/25 font-normal">(optional)</span></h3>
-            <input
-              value={form.videoSolution ?? ''}
-              onChange={e => set('videoSolution', e.target.value)}
-              placeholder="Paste YouTube / video URL…"
-              className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder:text-white/20 outline-none"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-            />
+            <div>
+              <label className="block text-sm font-bold text-slate-300 mb-1.5 flex items-center gap-2">
+                <Play className="w-4 h-4 text-rose-400" />
+                Video Solution URL (Optional)
+              </label>
+              <input
+                type="text"
+                value={form.videoSolutionUrl || form.videoSolution || ''}
+                onChange={e => {
+                  set('videoSolutionUrl', e.target.value);
+                  set('videoSolution', e.target.value);
+                }}
+                placeholder="https://youtube.com/watch?v=..."
+                className="w-full bg-[#181a25] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-cyan-400/50 transition-colors"
+              />
+            </div>
           </div>
 
           {/* Submit bar */}
@@ -685,7 +706,8 @@ const QuestionForm: React.FC<{
   );
 };
 
-// ─── Question Bank ────────────────────────────────────────────────────────────
+
+// ─── Question Bank Helpers ───────────────────────────────────────────────────
 
 const diffColor = (d: Difficulty) =>
   d === 'easy' ? '#10b981' : d === 'hard' ? '#ef4444' : '#f59e0b';
@@ -693,310 +715,986 @@ const diffColor = (d: Difficulty) =>
 const sourceLabel = (s: QSource) =>
   SOURCE_OPTIONS.find(o => o.value === s)?.label ?? s;
 
-const QuestionBank: React.FC<{
-  questions: Question[];
-  onAdd: () => void;
-  onEdit: (q: Question) => void;
-  onDelete: (id: string) => void;
-  onDuplicate: (q: Question) => void;
-}> = ({ questions, onAdd, onEdit, onDelete, onDuplicate }) => {
-  const [search, setSearch]         = useState('');
-  const [examF, setExamF]           = useState<ExamType | 'all'>('all');
-  const [sourceF, setSourceF]       = useState<QSource | 'all'>('all');
-  const [diffF, setDiffF]           = useState<Difficulty | 'all'>('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+// ─── Question Card (Flashcard Design) ─────────────────────────────────────────
 
-  const filtered = useMemo(() => {
-    return questions.filter(q => {
-      if (examF !== 'all' && q.exam !== examF) return false;
-      if (sourceF !== 'all' && q.source !== sourceF) return false;
-      if (diffF !== 'all' && q.difficulty !== diffF) return false;
-      if (search.trim()) {
-        const s = search.toLowerCase();
-        return q.questionText.toLowerCase().includes(s) ||
-               q.chapterTitle.toLowerCase().includes(s) ||
-               q.topicTitle.toLowerCase().includes(s);
-      }
-      return true;
-    });
-  }, [questions, examF, sourceF, diffF, search]);
+interface CreatorQuestionCardProps {
+  question: Question;
+  index: number;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  onPreview: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+}
 
-  const total     = questions.length;
-  const published = questions.filter(q => q.status === 'published').length;
-  const drafts    = questions.filter(q => q.status === 'draft').length;
-  const bySource  = SOURCE_OPTIONS.map(s => ({ label: s.label, count: questions.filter(q => q.source === s.value).length }));
+const CreatorQuestionCard: React.FC<CreatorQuestionCardProps> = ({
+  question: q,
+  index,
+  isSelected,
+  onToggleSelect,
+  onPreview,
+  onEdit,
+  onDelete,
+  onDuplicate
+}) => {
+  const formattedIndex = (index + 1).toString().padStart(2, '0');
+  const unitTheme = getChapterUnitTheme(q.chapterTitle, q.subjectName, q.exam === 'neet' ? 'NEET' : 'JEE');
 
-  const renderExpandedBody = (q: Question) => {
-    if (q.qType === 'statement' || q.qType === 'assertion') {
-      const isAssertion = q.qType === 'assertion';
-      const presetOptions = isAssertion ? ASSERTION_OPTIONS : STATEMENT_OPTIONS;
-      return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <p className="text-[10px] font-bold text-white/50 uppercase mb-1">{isAssertion ? 'Assertion (A)' : 'Statement A'}</p>
-              <p className="text-sm text-white">{q.statementA}</p>
-            </div>
-            <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <p className="text-[10px] font-bold text-white/50 uppercase mb-1">{isAssertion ? 'Reason (R)' : 'Statement B'}</p>
-              <p className="text-sm text-white">{q.statementB}</p>
-            </div>
-          </div>
-          <div className="p-4 rounded-xl" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-            <p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">Correct Answer</p>
-            <p className="text-sm text-emerald-100">{presetOptions[q.correctIndex]}</p>
-          </div>
-        </div>
-      );
-    }
-    
-    if (q.qType === 'match') {
-      return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold text-white/50 uppercase">Left Column</p>
-              {q.matchLeft?.map((val, i) => (
-                <div key={i} className="flex gap-2 text-sm"><span className="text-blue-400 font-bold w-4">{['A','B','C','D'][i]}</span><span className="text-white/80">{val}</span></div>
-              ))}
-            </div>
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold text-white/50 uppercase">Right Column</p>
-              {q.matchRight?.map((val, i) => (
-                <div key={i} className="flex gap-2 text-sm"><span className="text-white/40 font-bold w-4">{['P','Q','R','S'][i]}</span><span className="text-white/80">{val}</span></div>
-              ))}
-            </div>
-          </div>
-          <div className="p-3 rounded-xl flex gap-4 bg-white/5 border border-white/10">
-            <span className="text-[10px] font-bold text-emerald-400 uppercase">Mappings:</span>
-            <span className="text-sm text-emerald-100 font-medium">
-              {q.matchMappings?.map(m => `${m.left}→${m.right}`).join(', ')}
-            </span>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {q.options.map((opt, i) => (
-          <div key={i} className="flex items-center gap-2.5 p-3 rounded-xl text-sm"
-            style={{
-              background: i === q.correctIndex ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.025)',
-              border: `1px solid ${i === q.correctIndex ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.06)'}`,
-            }}>
-            <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0"
-              style={{ background: i === q.correctIndex ? '#10b981' : 'rgba(255,255,255,0.07)', color: i === q.correctIndex ? '#fff' : 'rgba(255,255,255,0.4)' }}>
-              {i === q.correctIndex ? <Check className="w-3.5 h-3.5" /> : ['A','B','C','D'][i]}
-            </span>
-            <div className="flex flex-col gap-1">
-              <span className={i === q.correctIndex ? 'text-emerald-300' : 'text-white/70'}>{opt.text || (opt.imageUrl ? '(Image Only)' : '—')}</span>
-              {opt.imageUrl && <img src={opt.imageUrl} alt="opt" className="h-10 object-contain rounded mt-1" />}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const diffBadgeColor =
+    q.difficulty === 'easy' ? '#10b981' : q.difficulty === 'hard' ? '#ef4444' : '#f59e0b';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-24">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-white">Question Bank</h2>
-          <p className="text-xs text-white/40 mt-0.5">{total} questions · {published} published · {drafts} drafts</p>
-        </div>
-        <button onClick={onAdd}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-black transition-all self-start sm:self-auto"
-          style={{ background: 'linear-gradient(135deg,#00f0ff,#0066ff)', boxShadow: '0 0 20px rgba(0,240,255,0.4)' }}>
-          <Plus className="w-4 h-4" /> Add Question
-        </button>
-      </div>
+    <div
+      onClick={onPreview}
+      className={`group relative rounded-2xl p-3 cursor-pointer transition-all duration-300 border flex flex-col justify-between overflow-hidden shadow-lg hover:translate-y-[-2px] select-none ${isSelected ? 'ring-2 ring-cyan-400' : ''}`}
+      style={{
+        background: unitTheme.cardBg,
+        borderColor: isSelected ? 'rgba(0,240,255,0.6)' : unitTheme.borderColor,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.35)'
+      }}
+    >
+      {/* Artwork Banner */}
+      <div
+        className="relative h-36 sm:h-44 rounded-xl overflow-hidden p-2.5 sm:p-3.5 flex flex-col justify-between border shadow-inner transition-all duration-300"
+        style={{
+          borderColor: 'rgba(255, 255, 255, 0.3)',
+          background: unitTheme.bannerGradient
+        }}
+      >
+        {/* Dot Matrix Pattern */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-20"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255, 255, 255, 0.7) 1.2px, transparent 1.2px)',
+            backgroundSize: '16px 16px',
+            backgroundPosition: 'center'
+          }}
+        />
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {bySource.map(s => (
-          <div key={s.label} className="rounded-2xl p-4 text-center"
-            style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <p className="text-xl font-black text-white">{s.count}</p>
-            <p className="text-[10px] text-white/35 mt-0.5 leading-tight">{s.label}</p>
+        {/* Large Centered Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span
+            className="text-4xl sm:text-7xl font-black tracking-tight font-sans transition-transform duration-300 group-hover:scale-105"
+            style={{ color: unitTheme.watermarkColor }}
+          >
+            #Q{formattedIndex}
+          </span>
+        </div>
+
+        {/* Top Badges */}
+        <div className="relative z-10 flex items-center justify-between gap-1 sm:gap-2">
+          <span
+            className="border px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9.5px] sm:text-[11px] font-black tracking-wider shadow-sm backdrop-blur-md text-white shrink-0"
+            style={{
+              backgroundColor: unitTheme.badgeBg,
+              borderColor: 'rgba(255, 255, 255, 0.35)'
+            }}
+          >
+            Q #{index + 1}
+          </span>
+
+          <div
+            className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9.5px] sm:text-xs font-black tracking-wide flex items-center gap-1 shadow-md shrink-0 uppercase"
+            style={{
+              backgroundColor: '#FFFFFF',
+              color: diffBadgeColor
+            }}
+          >
+            <Award className="w-3 h-3 stroke-[2.5]" />
+            <span>{q.difficulty}</span>
           </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search questions, chapters…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder:text-white/20 outline-none"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
         </div>
 
-        {/* Exam filter */}
-        <div className="flex items-center gap-1 p-1 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          {(['all','neet','jee'] as const).map(e => (
-            <button key={e} onClick={() => setExamF(e)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-              style={examF === e
-                ? { background: '#00f0ff22', color: '#00f0ff', border: '1px solid #00f0ff44' }
-                : { color: 'rgba(255,255,255,0.35)' }}>
-              {e === 'all' ? 'All' : e.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        {/* Bottom Badges */}
+        <div className="relative z-10 flex items-center justify-between gap-1 sm:gap-2 mt-auto">
+          <span
+            className="border px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[8.5px] sm:text-[10px] font-bold tracking-wider flex items-center gap-1 shadow-sm backdrop-blur-md text-white truncate max-w-[50%]"
+            style={{
+              backgroundColor: unitTheme.badgeBg,
+              borderColor: 'rgba(255, 255, 255, 0.3)'
+            }}
+          >
+            <Flame className="w-3 h-3 text-white shrink-0" />
+            <span className="truncate">{q.year}</span>
+          </span>
 
-        {/* Source filter */}
-        <select value={sourceF} onChange={e => setSourceF(e.target.value as QSource | 'all')}
-          className="px-3 py-2 rounded-xl text-xs font-bold text-white outline-none"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <option value="all">All Sources</option>
-          {SOURCE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-
-        {/* Difficulty filter */}
-        <div className="flex items-center gap-1 p-1 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          {(['all','easy','medium','hard'] as const).map(d => (
-            <button key={d} onClick={() => setDiffF(d)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize"
-              style={diffF === d
-                ? { background: d !== 'all' ? diffColor(d as Difficulty) + '22' : '#ffffff18', color: d !== 'all' ? diffColor(d as Difficulty) : '#fff', border: `1px solid ${d !== 'all' ? diffColor(d as Difficulty) + '44' : 'rgba(255,255,255,0.2)'}` }
-                : { color: 'rgba(255,255,255,0.35)' }}>
-              {d === 'all' ? 'All' : d}
-            </button>
-          ))}
+          <span
+            className="border px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[8.5px] sm:text-[10px] font-semibold tracking-wider flex items-center gap-1 shadow-sm backdrop-blur-md text-white truncate max-w-[50%]"
+            style={{
+              backgroundColor: unitTheme.badgeBg,
+              borderColor: 'rgba(255, 255, 255, 0.3)'
+            }}
+          >
+            <BookOpen className="w-3 h-3 text-white/90 shrink-0" />
+            <span className="truncate">{q.qType}</span>
+          </span>
         </div>
       </div>
 
-      {/* Question list */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <BookOpen className="w-12 h-12 text-white/10 mx-auto mb-3" />
-          <p className="text-white/30 text-sm">
-            {questions.length === 0 ? 'No questions yet. Click "Add Question" to start!' : 'No questions match your filters.'}
+      {/* Card Body */}
+      <div className="pt-2 sm:pt-3 pb-1 px-0.5 sm:px-1 flex-1 flex flex-col justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-1.5 sm:gap-2 mb-1">
+            <div className="flex items-center gap-1.5 flex-wrap flex-1">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-white/10 text-white/70">
+                {q.subjectName}
+              </span>
+              {q.status === 'draft' ? (
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  DRAFT
+                </span>
+              ) : (
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  PUBLISHED
+                </span>
+              )}
+            </div>
+
+            {/* Selection Checkbox */}
+            {onToggleSelect && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelect();
+                }}
+                title={isSelected ? "Deselect question" : "Select question"}
+                className="shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border flex items-center justify-center transition-all active:scale-95 shadow-sm cursor-pointer"
+                style={{
+                  backgroundColor: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.15)',
+                  borderColor: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)',
+                  color: isSelected ? '#000000' : 'transparent'
+                }}
+              >
+                <Check className={`w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3] ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-70 text-white'}`} />
+              </button>
+            )}
+          </div>
+
+          <h4 className="font-extrabold text-xs sm:text-sm text-white leading-snug line-clamp-2 transition-colors group-hover:text-white/90">
+            {q.questionText || '(Figure Question)'}
+          </h4>
+
+          <p className="text-[10px] text-white/50 truncate mt-1">
+            {q.chapterTitle} › {q.topicTitle}
           </p>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((q, idx) => {
-            const isExpanded = expandedId === q.id;
-            const hasImage = !!q.questionImageUrl;
+
+        {/* Action Buttons Row */}
+        <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between gap-1.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreview();
+            }}
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all cursor-pointer"
+          >
+            <Eye className="w-3 h-3" />
+            <span>Preview</span>
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            title="Edit Question"
+            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/70 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 transition-colors cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            title="Duplicate Question"
+            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/70 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 transition-colors cursor-pointer"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            title="Delete Question"
+            className="w-7 h-7 rounded-xl flex items-center justify-center text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Question Preview Modal ───────────────────────────────────────────────────
+
+const QuestionPreviewModal: React.FC<{
+  question: Question;
+  onClose: () => void;
+  onEdit: () => void;
+  onNext?: () => void;
+  onPrev?: () => void;
+  hasNext?: boolean;
+  hasPrev?: boolean;
+}> = ({ question: q, onClose, onEdit, onNext, onPrev, hasNext, hasPrev }) => {
+  const diffBadgeColor =
+    q.difficulty === 'easy' ? '#10b981' : q.difficulty === 'hard' ? '#ef4444' : '#f59e0b';
+  const isPub = q.status === 'published';
+  const LABELS = ['A', 'B', 'C', 'D'];
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' && hasNext && onNext) onNext();
+      if (e.key === 'ArrowLeft' && hasPrev && onPrev) onPrev();
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasNext, hasPrev, onNext, onPrev, onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+      <div
+        className="relative w-full max-w-2xl flex flex-col rounded-3xl shadow-2xl overflow-hidden border border-white/10"
+        style={{
+          background: 'linear-gradient(180deg, #0d1020 0%, #0a0c18 100%)',
+          maxHeight: 'min(82vh, 560px)'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Accent top bar */}
+        <div className="h-1 w-full shrink-0" style={{ background: 'linear-gradient(90deg, #00f0ff, #6366f1, #a855f7)' }} />
+
+        {/* Header (Fixed) */}
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 shrink-0 bg-black/20">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-black px-3 py-1 rounded-full uppercase bg-cyan-400/15 text-cyan-300 border border-cyan-400/30">
+              {q.exam.toUpperCase()}
+            </span>
+            <span
+              className="text-[11px] font-black px-3 py-1 rounded-full uppercase"
+              style={{ backgroundColor: `${diffBadgeColor}20`, color: diffBadgeColor, border: `1px solid ${diffBadgeColor}40` }}
+            >
+              {q.difficulty}
+            </span>
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white/70 border border-white/10">
+              {q.qType}
+            </span>
+            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
+              isPub ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+            }`}>
+              {q.status}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1 mr-1 sm:mr-2 border-r border-white/10 pr-2 sm:pr-3">
+              <button
+                onClick={onPrev}
+                disabled={!hasPrev}
+                className={`p-1.5 rounded-lg transition-all ${hasPrev ? 'text-white/70 hover:text-white hover:bg-white/10 cursor-pointer' : 'text-white/20 cursor-not-allowed'}`}
+                title="Previous Question"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+              <button
+                onClick={onNext}
+                disabled={!hasNext}
+                className={`p-1.5 rounded-lg transition-all ${hasNext ? 'text-white/70 hover:text-white hover:bg-white/10 cursor-pointer' : 'text-white/20 cursor-not-allowed'}`}
+                title="Next Question"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            </div>
+
+            <button
+              onClick={onEdit}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-all flex items-center gap-1.5 cursor-pointer border border-white/15"
+            >
+              <Edit3 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Edit</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="p-4 sm:p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-xs text-white/40 flex-wrap">
+            <span className="text-white/60 font-semibold">{q.subjectName}</span>
+            <span>›</span>
+            <span>{q.chapterTitle}</span>
+            <span>›</span>
+            <span>{q.topicTitle}</span>
+            {q.subtopicTitle && <><span>›</span><span>{q.subtopicTitle}</span></>}
+            {q.year && <span className="ml-auto text-white/30 font-mono">{q.year}</span>}
+          </div>
+
+        {/* Question Content */}
+        <div className="p-5 rounded-2xl space-y-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+          {q.questionText && (
+            <p className="text-sm sm:text-base font-semibold text-white leading-relaxed whitespace-pre-wrap">
+              {q.questionText}
+            </p>
+          )}
+          {q.questionImageUrl && (
+            <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5 p-2 flex items-center justify-center">
+              <img
+                src={q.questionImageUrl}
+                alt="Question Figure"
+                className="max-h-64 w-auto object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Advanced Question Specific UI */}
+        {(q.qType === 'assertion' || q.qType === 'statement') && (
+          <div className="space-y-3">
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+              <span className="text-xs font-black text-cyan-400 mb-1 block uppercase">
+                {q.qType === 'assertion' ? 'Assertion (A)' : 'Statement I'}
+              </span>
+              <p className="text-sm text-white/90">{q.statementA}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+              <span className="text-xs font-black text-cyan-400 mb-1 block uppercase">
+                {q.qType === 'assertion' ? 'Reason (R)' : 'Statement II'}
+              </span>
+              <p className="text-sm text-white/90">{q.statementB}</p>
+            </div>
+          </div>
+        )}
+
+        {q.qType === 'match' && (
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex gap-4">
+            <div className="flex-1 space-y-2">
+              <div className="text-xs font-black text-cyan-400 uppercase text-center mb-3 border-b border-white/10 pb-2">Column I</div>
+              {q.matchLeft?.map((item, i) => item && (
+                <div key={i} className="flex gap-3 items-center text-sm text-white/80">
+                  <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-black shrink-0">{['A','B','C','D'][i]}</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div className="w-px bg-white/10" />
+            <div className="flex-1 space-y-2">
+              <div className="text-xs font-black text-cyan-400 uppercase text-center mb-3 border-b border-white/10 pb-2">Column II</div>
+              {q.matchRight?.map((item, i) => item && (
+                <div key={i} className="flex gap-3 items-center text-sm text-white/80">
+                  <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-black shrink-0">{['P','Q','R','S'][i]}</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Options */}
+        <div className="space-y-2.5">
+          {q.options.map((opt, i) => {
+            let displayText = opt.text;
+            if (!displayText && q.qType === 'assertion') {
+              if (i === 0) displayText = 'Both (A) and (R) are true and (R) is the correct explanation of (A)';
+              if (i === 1) displayText = 'Both (A) and (R) are true but (R) is not the correct explanation of (A)';
+              if (i === 2) displayText = '(A) is true but (R) is false';
+              if (i === 3) displayText = '(A) is false but (R) is true';
+            }
+            if (!displayText && q.qType === 'statement') {
+              if (i === 0) displayText = 'Both Statement I and Statement II are correct';
+              if (i === 1) displayText = 'Both Statement I and Statement II are incorrect';
+              if (i === 2) displayText = 'Statement I is correct but Statement II is incorrect';
+              if (i === 3) displayText = 'Statement I is incorrect but Statement II is correct';
+            }
+
+            const isCorrect = q.correctIndex === i;
             return (
-              <div key={q.id} className="rounded-2xl overflow-hidden transition-all"
-                style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${isExpanded ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.07)'}` }}>
-                {/* Row */}
-                <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : q.id)}>
-                  {/* Index */}
-                  <span className="text-xs font-black text-white/20 w-6 shrink-0">{idx + 1}</span>
-
-                  {/* Badges */}
-                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase"
-                      style={{ background: '#00f0ff18', color: '#00f0ff', border: '1px solid #00f0ff33' }}>
-                      {q.exam.toUpperCase()}
-                    </span>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                      style={{ background: diffColor(q.difficulty) + '18', color: diffColor(q.difficulty), border: `1px solid ${diffColor(q.difficulty)}33` }}>
-                      {q.difficulty}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white/40"
-                      style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      {q.qType}
-                    </span>
-                    {q.status === 'draft' && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-amber-400"
-                        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                        DRAFT
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Question preview */}
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    {hasImage && <ImageIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                    <p className="text-sm text-white/75 truncate">{q.questionText || '(no question text)'}</p>
-                  </div>
-
-                  {/* Chapter */}
-                  <span className="text-[11px] text-white/30 hidden sm:block truncate max-w-[140px] shrink-0">{q.chapterTitle}</span>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => onEdit(q)} title="Edit"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white hover:bg-white/08 transition-all">
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => onDuplicate(q)} title="Duplicate"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white hover:bg-white/08 transition-all">
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => onDelete(q.id)} title="Delete"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-400/08 transition-all">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <ChevronDown className={`w-4 h-4 text-white/20 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                  </div>
+              <div
+                key={i}
+                className={`flex items-start gap-3.5 p-4 rounded-xl border transition-all ${
+                  isCorrect ? 'border-emerald-500/50' : 'border-white/8'
+                }`}
+                style={{ background: isCorrect ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)' }}
+              >
+                {/* Letter Bubble */}
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-black transition-colors ${
+                    isCorrect
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-white/10 text-white/50 border border-white/20'
+                  }`}
+                >
+                  {isCorrect ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : LABELS[i]}
                 </div>
 
-                {/* Expanded view */}
-                {isExpanded && (
-                  <div className="px-4 pb-5 space-y-4 border-t border-white/05 pt-4 animate-in fade-in duration-200">
-                    {/* Topic path */}
-                    <p className="text-[11px] text-white/35">
-                      {q.subjectName} › {q.chapterTitle} › {q.topicTitle}{q.subtopicTitle ? ` › ${q.subtopicTitle}` : ''}
-                    </p>
+                {/* Content */}
+                <div className="flex-1 flex flex-col gap-2">
+                  {displayText && (
+                    <span className={`text-sm leading-relaxed ${isCorrect ? 'text-emerald-300 font-semibold' : 'text-white/90'}`}>
+                      {displayText}
+                    </span>
+                  )}
+                  {opt.imageUrl && <img src={opt.imageUrl} alt={`Option ${LABELS[i]}`} className="max-h-32 object-contain rounded-lg border border-white/10" />}
+                </div>
 
-                    {/* Full question */}
-                    <div className="p-4 rounded-xl text-sm text-white leading-relaxed space-y-3"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <p>{q.questionText}</p>
-                      {q.questionImageUrl && (
-                        <img src={q.questionImageUrl} alt="Question figure" className="max-h-48 object-contain rounded-lg border border-white/10" />
-                      )}
-                    </div>
-
-                    {/* Options / Dynamic Body */}
-                    {renderExpandedBody(q)}
-
-                    {/* Explanation */}
-                    <div className="p-4 rounded-xl"
-                      style={{ background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.12)' }}>
-                      <p className="text-[10px] font-black text-cyan-400 uppercase tracking-wider mb-1.5">Explanation</p>
-                      <p className="text-sm text-white/75 leading-relaxed">{q.explanation}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[11px] text-white/25">
-                      <Tag className="w-3 h-3" />
-                      <span>{sourceLabel(q.source)}</span>
-                      <span>·</span>
-                      <Clock className="w-3 h-3" />
-                      <span>{new Date(q.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
+                {isCorrect && (
+                  <span className="text-[10px] font-black text-emerald-400 shrink-0 ml-2 mt-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 uppercase tracking-wider">
+                    Correct
+                  </span>
                 )}
               </div>
             );
           })}
         </div>
+
+        {/* Solutions: Text & Video Solution Tabs */}
+        <QuestionSolutionTabs
+          textSolution={q.solutionExplanation || q.explanation}
+          videoUrl={q.videoSolutionUrl || q.videoSolution}
+          defaultTab={(q.solutionExplanation || q.explanation) ? 'text' : 'video'}
+        />
+
+        {/* Meta */}
+        <div className="flex items-center gap-4 text-[11px] text-white/35 pt-3 border-t border-white/8">
+          {q.source && <span>Source: <strong className="text-white/55">{sourceLabel(q.source)}</strong></span>}
+          {q.year && <span>Year: <strong className="text-white/55">{q.year}</strong></span>}
+          {q.createdAt && <span className="ml-auto">Added: <strong className="text-white/55">{new Date(q.createdAt).toLocaleDateString()}</strong></span>}
+        </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ─── Redesigned Question Bank Component (Flashcards Aesthetic) ────────────────
+
+const QuestionBank: React.FC<{
+  questions: Question[];
+  selectedQuestions: string[];
+  toggleSelect: (id: string) => void;
+  toggleSelectAll: (ids: string[]) => void;
+  onAdd: () => void;
+  onBulkAdd?: (qs: Question[]) => void;
+  onEdit: (q: Question) => void;
+  onDelete: (id: string) => void;
+  onDuplicate: (q: Question) => void;
+  onOpenTestBuilder: () => void;
+}> = ({ questions, selectedQuestions, toggleSelect, toggleSelectAll, onAdd, onBulkAdd, onEdit, onDelete, onDuplicate, onOpenTestBuilder }) => {
+  const [search, setSearch] = useState('');
+  const [selectedExam, setSelectedExam] = useState<ExamType>('neet');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedSource, setSelectedSource] = useState<QSource | 'all'>('all');
+  const [selectedDiff, setSelectedDiff] = useState<Difficulty | 'all'>('all');
+  const [selectedType, setSelectedType] = useState<QType | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [selectedChapter, setSelectedChapter] = useState<string>('all');
+  const [selectedTopic, setSelectedTopic] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [previewTarget, setPreviewTarget] = useState<Question | null>(null);
+
+  const availableChapters = useMemo(() => Array.from(new Set(questions.filter(q => (selectedSubject === 'all' || q.subjectName === selectedSubject) && q.exam === selectedExam && q.chapterTitle).map(q => q.chapterTitle))).sort(), [questions, selectedSubject, selectedExam]);
+  const availableTopics = useMemo(() => Array.from(new Set(questions.filter(q => (selectedSubject === 'all' || q.subjectName === selectedSubject) && q.exam === selectedExam && (selectedChapter === 'all' || q.chapterTitle === selectedChapter) && q.topicTitle).map(q => q.topicTitle))).sort(), [questions, selectedSubject, selectedExam, selectedChapter]);
+  const availableYears = useMemo(() => Array.from(new Set(questions.filter(q => q.source === 'pyq' && q.year).map(q => q.year as string))).sort().reverse(), [questions]);
+
+  // Available subjects based on exam
+  const subjectList = useMemo(() => {
+    if (selectedExam === 'neet') {
+      return ['all', 'Biology', 'Physics', 'Chemistry'];
+    }
+    return ['all', 'Physics', 'Chemistry', 'Mathematics'];
+  }, [selectedExam]);
+
+  // Reset subject filter if invalid on exam switch
+  useEffect(() => {
+    if (selectedSubject !== 'all' && !subjectList.includes(selectedSubject)) {
+      setSelectedSubject('all');
+    }
+  }, [selectedExam, subjectList, selectedSubject]);
+
+  // Filter questions
+  const filtered = useMemo(() => {
+    return questions.filter(q => {
+      if (q.exam !== selectedExam) return false;
+      if (selectedSubject !== 'all' && !q.subjectName.toLowerCase().includes(selectedSubject.toLowerCase())) return false;
+      if (selectedSource !== 'all' && q.source !== selectedSource) return false;
+      if (selectedDiff !== 'all' && q.difficulty !== selectedDiff) return false;
+      if (selectedType !== 'all' && q.qType !== selectedType) return false;
+      if (statusFilter !== 'all' && q.status !== statusFilter) return false;
+      if (selectedChapter !== 'all' && q.chapterTitle !== selectedChapter) return false;
+      if (selectedTopic !== 'all' && q.topicTitle !== selectedTopic) return false;
+      if (selectedYear !== 'all' && q.year !== selectedYear) return false;
+
+      if (!search.trim()) return true;
+      const s = search.toLowerCase();
+      return (
+        q.questionText.toLowerCase().includes(s) ||
+        q.chapterTitle.toLowerCase().includes(s) ||
+        q.topicTitle.toLowerCase().includes(s) ||
+        (q.year || '').toLowerCase().includes(s)
+      );
+    });
+  }, [questions, selectedExam, selectedSubject, selectedSource, selectedDiff, selectedType, statusFilter, selectedChapter, selectedTopic, selectedYear, search]);
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSelectedSubject('all');
+    setSelectedSource('all');
+    setSelectedDiff('all');
+    setSelectedType('all');
+    setStatusFilter('all');
+    setSelectedChapter('all');
+    setSelectedTopic('all');
+    setSelectedYear('all');
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300 pb-24">
+      {/* Top Control Bar: Search + Add Button */}
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          {/* Search */}
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search questions by text, chapter, topic, or year tag..."
+              className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl py-3 pl-12 pr-4 text-sm text-[var(--text-primary)] placeholder:text-gray-500 focus:outline-none focus:border-[var(--color-primary)] shadow-sm transition-all"
+            />
+          </div>
+
+          {/* Add Button and Action */}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {selectedQuestions.length > 0 && (
+              <button
+                onClick={onOpenTestBuilder}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black text-black transition-all cursor-pointer shadow-lg bg-emerald-400 hover:bg-emerald-300"
+              >
+                <span>Create Test ({selectedQuestions.length})</span>
+              </button>
+            )}
+            <button
+              onClick={onAdd}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black text-black transition-all cursor-pointer shadow-lg active:scale-95"
+              style={{
+                background: 'linear-gradient(135deg,#00f0ff,#0066ff)',
+                boxShadow: '0 0 20px rgba(0,240,255,0.45)'
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Question</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: Exam Toggles & CSV Tools */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Exam Toggles (NEET / JEE) */}
+          <div className="flex items-center gap-1.5 p-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] w-fit">
+            {(['neet', 'jee'] as const).map(e => (
+              <button
+                key={e}
+                onClick={() => setSelectedExam(e)}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  selectedExam === e
+                    ? 'bg-[var(--color-primary)] text-black shadow-md'
+                    : 'text-[var(--text-muted)] hover:text-white'
+                }`}
+              >
+                {e === 'neet' ? <Flame className="w-3.5 h-3.5" /> : <Atom className="w-3.5 h-3.5" />}
+                <span>{e === 'neet' ? 'NEET (UG)' : 'JEE Main'}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Tools Row (Below Add Question) */}
+          <div className="flex justify-end">
+            <CsvUploader 
+              onUploadSuccess={(qs) => onBulkAdd ? onBulkAdd(qs) : qs.forEach(q => onDuplicate(q))} 
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Subject Navigation Pills */}
+      <div className="flex items-center gap-2.5 overflow-x-auto custom-scrollbar pb-2 border-b border-[var(--border-color)]">
+        {subjectList.map(subj => {
+          const isActive = selectedSubject === subj;
+          return (
+            <button
+              key={subj}
+              onClick={() => setSelectedSubject(subj)}
+              className={`shrink-0 px-5 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all border cursor-pointer ${
+                isActive
+                  ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] border-[var(--color-primary)] shadow-sm'
+                  : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-color-hover)] hover:text-white'
+              }`}
+            >
+              {subj === 'all' ? 'All Subjects' : subj}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sub-Filters Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Source Filter */}
+          <select
+            value={selectedSource}
+            onChange={e => {
+              setSelectedSource(e.target.value as QSource | 'all');
+              if (e.target.value !== 'pyq') setSelectedYear('all');
+            }}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-white/10 border border-white/15 outline-none cursor-pointer"
+          >
+            <option value="all" className="bg-gray-900">All Sources</option>
+            {SOURCE_OPTIONS.map(s => <option key={s.value} value={s.value} className="bg-gray-900">{s.label}</option>)}
+          </select>
+          
+          {/* Year Filter (Only if PYQ) */}
+          {selectedSource === 'pyq' && (
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(e.target.value)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-[var(--color-primary)]/20 border border-[var(--color-primary)]/40 outline-none cursor-pointer text-[var(--color-primary)]"
+            >
+              <option value="all" className="bg-gray-900">All Years</option>
+              {availableYears.map(y => <option key={y} value={y} className="bg-gray-900">{y}</option>)}
+            </select>
+          )}
+
+          {/* Chapter Filter */}
+          <select
+            value={selectedChapter}
+            onChange={e => { setSelectedChapter(e.target.value); setSelectedTopic('all'); }}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-white/10 border border-white/15 outline-none cursor-pointer max-w-[140px] truncate"
+          >
+            <option value="all" className="bg-gray-900">All Chapters</option>
+            {availableChapters.map(c => <option key={c} value={c} className="bg-gray-900">{c}</option>)}
+          </select>
+
+          {/* Topic Filter */}
+          <select
+            value={selectedTopic}
+            onChange={e => setSelectedTopic(e.target.value)}
+            disabled={selectedChapter === 'all'}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-white/10 border border-white/15 outline-none cursor-pointer max-w-[140px] truncate disabled:opacity-50"
+          >
+            <option value="all" className="bg-gray-900">All Topics</option>
+            {availableTopics.map(t => <option key={t} value={t} className="bg-gray-900">{t}</option>)}
+          </select>
+
+          {/* Difficulty Filter */}
+          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-white/5 border border-white/10">
+            {(['all', 'easy', 'medium', 'hard'] as const).map(d => (
+              <button
+                key={d}
+                onClick={() => setSelectedDiff(d)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all capitalize cursor-pointer ${
+                  selectedDiff === d
+                    ? 'bg-white text-black shadow-sm'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+
+          {/* Question Type Filter */}
+          <select
+            value={selectedType}
+            onChange={e => setSelectedType(e.target.value as QType | 'all')}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-white/10 border border-white/15 outline-none cursor-pointer"
+          >
+            <option value="all" className="bg-gray-900">All Question Types</option>
+            {Q_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value} className="bg-gray-900">{t.label}</option>)}
+          </select>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-white/5 border border-white/10">
+            {(['all', 'published', 'draft'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all capitalize cursor-pointer ${
+                  statusFilter === s
+                    ? 'bg-white text-black shadow-sm'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* View Mode & Count */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-white/40 font-mono">
+            {filtered.length} Questions
+          </span>
+          <span className="text-xs font-bold text-cyan-400">
+            {selectedQuestions.length} Selected
+          </span>
+
+          <button
+            onClick={() => toggleSelectAll(filtered.map(q => q.id))}
+            title="Select all filtered questions"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white/70 bg-white/10 hover:bg-white/20 hover:text-white border border-white/15 transition-all cursor-pointer"
+          >
+            <Check className="w-3 h-3" />
+            <span>Select All</span>
+          </button>
+
+          {(search || selectedSubject !== 'all' || selectedSource !== 'all' || selectedDiff !== 'all' || selectedType !== 'all' || statusFilter !== 'all') && (
+            <button
+              onClick={handleResetFilters}
+              title="Reset all filters"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white/70 bg-white/10 hover:bg-white/20 hover:text-white border border-white/15 transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-white/5 border border-white/10">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'
+              }`}
+              title="Flashcard Grid View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'
+              }`}
+              title="Table / List View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Questions Content */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10">
+          <BookOpen className="w-12 h-12 text-white/20 mx-auto mb-3" />
+          <p className="text-white/40 text-sm font-medium">
+            {questions.length === 0
+              ? 'No questions found. Click "Add Question" to start building your bank!'
+              : 'No questions match your selected filter criteria.'}
+          </p>
+          <button
+            onClick={onAdd}
+            className="mt-4 px-5 py-2.5 rounded-xl text-xs font-black text-black bg-cyan-400 hover:bg-cyan-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add Question Now
+          </button>
+        </div>
+      ) : viewMode === 'grid' ? (
+        /* Flashcard Grid Layout */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {filtered.map((q, idx) => (
+            <CreatorQuestionCard
+              key={q.id}
+              question={q}
+              index={idx}
+              isSelected={selectedQuestions.includes(q.id)}
+              onToggleSelect={() => toggleSelect(q.id)}
+              onPreview={() => setPreviewTarget(q)}
+              onEdit={() => onEdit(q)}
+              onDelete={() => onDelete(q.id)}
+              onDuplicate={() => onDuplicate(q)}
+            />
+          ))}
+        </div>
+      ) : (
+        /* Compact List View */
+        <div className="space-y-2.5">
+          {filtered.map((q, idx) => {
+            const isPub = q.status === 'published';
+            const isSelected = selectedQuestions.includes(q.id);
+            return (
+              <div
+                key={q.id}
+                onClick={() => setPreviewTarget(q)}
+                className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                  isSelected ? 'bg-cyan-500/10 border-cyan-400/50' : 'bg-white/5 border-white/10 hover:border-cyan-400/40'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(q.id);
+                    }}
+                    title={isSelected ? "Deselect question" : "Select question"}
+                    className="shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                    style={{
+                      backgroundColor: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.1)',
+                      borderColor: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)',
+                      color: isSelected ? '#000000' : 'transparent'
+                    }}
+                  >
+                    <Check className={`w-2.5 h-2.5 stroke-[3] ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-70 text-white'}`} />
+                  </button>
+                  <span className="w-6 text-xs font-mono font-bold text-white/30 shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase bg-cyan-400/20 text-cyan-300 shrink-0">
+                    {q.exam.toUpperCase()}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-white/10 text-white/70 shrink-0">
+                    {q.qType}
+                  </span>
+                  <p className="text-xs sm:text-sm font-semibold text-white/90 truncate flex-1">
+                    {q.questionText || '(Figure Question)'}
+                  </p>
+                  <span className="text-[11px] text-white/40 hidden md:block truncate max-w-[160px] shrink-0">
+                    {q.chapterTitle}
+                  </span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0 ${
+                    isPub ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                  }`}>
+                    {q.status}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => setPreviewTarget(q)}
+                    className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    title="Preview"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onEdit(q)}
+                    className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    title="Edit"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDuplicate(q)}
+                    className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    title="Duplicate"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDelete(q.id)}
+                    className="p-1.5 rounded-lg text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      {/* Question Preview Modal */}
+      {previewTarget && (() => {
+        const currentIndex = filtered.findIndex(q => q.id === previewTarget.id);
+        const hasPrev = currentIndex > 0;
+        const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
+
+        return (
+          <QuestionPreviewModal
+            question={previewTarget}
+            onClose={() => setPreviewTarget(null)}
+            onEdit={() => {
+              const target = previewTarget;
+              setPreviewTarget(null);
+              onEdit(target);
+            }}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            onPrev={() => hasPrev && setPreviewTarget(filtered[currentIndex - 1])}
+            onNext={() => hasNext && setPreviewTarget(filtered[currentIndex + 1])}
+          />
+        );
+      })()}
     </div>
   );
 };
 
-// ─── Creator Page ─────────────────────────────────────────────────────────────
+// ─── Creator Page (Root) ──────────────────────────────────────────────────────
 
-type CreatorView = 'bank' | 'add' | 'edit';
+type CreatorView = 'bank' | 'add' | 'edit' | 'tests';
 
 export const CreatorPage: React.FC = () => {
-  const [view, setView]           = useState<CreatorView>('bank');
+  const [view, setViewInternal] = useState<CreatorView>(() => {
+    const segments = window.location.pathname.split('/');
+    if (segments[1] === 'creator-studio' && segments[2]) {
+      if (['bank', 'add', 'edit', 'tests'].includes(segments[2])) {
+        return segments[2] as CreatorView;
+      }
+    }
+    return 'bank';
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const segments = window.location.pathname.split('/');
+      if (segments[1] === 'creator-studio' && segments[2]) {
+        if (['bank', 'add', 'edit', 'tests'].includes(segments[2])) {
+          setViewInternal(segments[2] as CreatorView);
+        }
+      } else {
+        setViewInternal('bank');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const setView = (v: CreatorView) => {
+    setViewInternal(v);
+    window.history.pushState(null, '', `/creator-studio/${v}`);
+  };
   const [editTarget, setEditTarget] = useState<Question | undefined>(undefined);
   const [questions, setQuestions]   = useState<Question[]>(loadQuestions);
   const [exam, setExam]             = useState<ExamType>('neet');
+  
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [isTestBuilderOpen, setIsTestBuilderOpen] = useState(false);
+  const { tests, addTest } = useCreatorStudioStorage();
+  const toggleSelect = (id: string) => {
+    setSelectedQuestions(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  };
+
+  const toggleSelectAll = (ids: string[]) => {
+    const allSelected = ids.length > 0 && ids.every(id => selectedQuestions.includes(id));
+    if (allSelected) {
+      setSelectedQuestions(prev => prev.filter(id => !ids.includes(id)));
+    } else {
+      setSelectedQuestions(prev => Array.from(new Set([...prev, ...ids])));
+    }
+  };
 
   const updateQuestions = (qs: Question[]) => {
     setQuestions(qs);
@@ -1017,15 +1715,25 @@ export const CreatorPage: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('Delete this question?')) return;
+    if (!window.confirm('Are you sure you want to delete this question?')) return;
     updateQuestions(questions.filter(q => q.id !== id));
   };
 
   const handleDuplicate = (q: Question) => {
-    const copy: Question = { ...q, id: `q_${Date.now()}`, createdAt: new Date().toISOString(), status: 'draft' };
+    const copy: Question = {
+      ...q,
+      id: `q_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      status: 'draft'
+    };
     updateQuestions([copy, ...questions]);
   };
 
+  const handleBulkAdd = (newQs: Question[]) => {
+    updateQuestions([...newQs, ...questions]);
+  };
+
+  // Add Question / Edit Question Page remains 100% UNTOUCHED
   if (view === 'add' || view === 'edit') {
     return (
       <QuestionForm
@@ -1038,62 +1746,91 @@ export const CreatorPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Page Header */}
-      <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8"
-        style={{ background: 'linear-gradient(135deg,#0d1226 0%,#080b16 100%)', border: '1px solid rgba(0,240,255,0.15)', boxShadow: '0 0 40px rgba(0,240,255,0.06)' }}>
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 80% 50%,rgba(0,240,255,0.08) 0%,transparent 65%)' }} />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu className="w-5 h-5 text-cyan-400" />
-              <span className="text-[11px] font-black uppercase tracking-widest text-cyan-400/60">Admin Only · Creator Studio</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Question Maker</h1>
-            <p className="text-sm text-white/40 mt-1">Build, organise, and publish questions for PYQ, Daily Practice, Mock Tests and more.</p>
-          </div>
-          <button onClick={() => { setEditTarget(undefined); setView('add'); }}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black text-black self-start sm:self-auto"
-            style={{ background: 'linear-gradient(135deg,#00f0ff,#0066ff)', boxShadow: '0 0 24px rgba(0,240,255,0.45)' }}>
-            <Plus className="w-5 h-5" /> Add Question
-          </button>
+    <div className="space-y-6 animate-in fade-in duration-300 pb-24">
+      {/* Tabs */}
+      <div className="flex items-center gap-4 border-b border-[var(--border-color)]">
+        <button
+          onClick={() => setView('bank')}
+          className={`pb-3 px-2 text-sm font-black transition-colors border-b-2 ${
+            view === 'bank' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-white/50 hover:text-white'
+          }`}
+        >
+          Questions
+        </button>
+        <button
+          onClick={() => setView('tests')}
+          className={`pb-3 px-2 text-sm font-black transition-colors border-b-2 ${
+            view === 'tests' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-white/50 hover:text-white'
+          }`}
+        >
+          Custom Tests
+        </button>
+      </div>
+
+      {view === 'tests' ? (
+        <CreatorStudioTestsView tests={tests} />
+      ) : (
+        <QuestionBank
+          questions={questions}
+          selectedQuestions={selectedQuestions}
+          toggleSelect={toggleSelect}
+          toggleSelectAll={toggleSelectAll}
+          onAdd={() => { setEditTarget(undefined); setView('add'); }}
+          onBulkAdd={handleBulkAdd}
+          onEdit={q => { setEditTarget(q); setView('edit'); }}
+          onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
+          onOpenTestBuilder={() => setIsTestBuilderOpen(true)}
+        />
+      )}
+
+      {isTestBuilderOpen && (
+        <TestBuilderModal
+          selectedQuestions={questions.filter(q => selectedQuestions.includes(q.id))}
+          onClose={() => setIsTestBuilderOpen(false)}
+          onSave={(test) => {
+            addTest(test);
+            setIsTestBuilderOpen(false);
+            setView('tests');
+            setSelectedQuestions([]); // clear selection after creating test
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const CreatorStudioTestsView: React.FC<{ tests: CustomTest[] }> = ({ tests }) => {
+  return (
+    <div className="space-y-4">
+      {tests.length === 0 ? (
+        <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10">
+          <p className="text-white/40 text-sm font-medium">No custom tests found. Select questions from the Questions tab to create one.</p>
         </div>
-      </div>
-
-      {/* Quick stat */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Total Questions', value: questions.length,                                              icon: BookOpen,      color: '#00f0ff' },
-          { label: 'Published',       value: questions.filter(q => q.status === 'published').length,       icon: CheckCircle2,  color: '#10b981' },
-          { label: 'Drafts',          value: questions.filter(q => q.status === 'draft').length,           icon: Edit3,         color: '#f59e0b' },
-          { label: 'PYQ Added',       value: questions.filter(q => q.source === 'pyq').length,             icon: Award,         color: '#a855f7' },
-        ].map(stat => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="rounded-2xl p-4 flex items-center gap-3"
-              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: stat.color + '18', border: `1px solid ${stat.color}30` }}>
-                <Icon className="w-4 h-4" style={{ color: stat.color }} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tests.map(t => (
+            <div key={t.id} className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-400/30 transition-all">
+              <h3 className="text-lg font-black text-white">{t.title}</h3>
+              <div className="mt-3 flex items-center gap-3 text-xs text-white/50">
+                <span className="uppercase text-cyan-400">{t.exam}</span>
+                <span>•</span>
+                <span>{t.durationMins} mins</span>
+                <span>•</span>
+                <span>{t.totalMarks} marks</span>
               </div>
-              <div>
-                <p className="text-lg font-black text-white">{stat.value}</p>
-                <p className="text-[10px] text-white/35 leading-none">{stat.label}</p>
-              </div>
+              <p className="mt-2 text-xs text-white/40">{t.questions.length} Questions</p>
+              
+              <button 
+                onClick={() => window.location.href = `/tools/mock-tests/active/${t.id}`}
+                className="mt-4 w-full py-2 bg-cyan-500/20 text-cyan-400 rounded-xl font-bold hover:bg-cyan-500/30 transition-colors"
+              >
+                Preview Test
+              </button>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Question Bank */}
-      <QuestionBank
-        questions={questions}
-        onAdd={() => { setEditTarget(undefined); setView('add'); }}
-        onEdit={q => { setEditTarget(q); setView('edit'); }}
-        onDelete={handleDelete}
-        onDuplicate={handleDuplicate}
-      />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

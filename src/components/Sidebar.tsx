@@ -107,9 +107,10 @@ export const Sidebar: React.FC = () => {
 
             if (sidebarCollapsed || mobileDrawerOpen) {
               return (
-                <button
+                <a
                   key={item.id}
-                  onClick={() => handleNavClick(item.id)}
+                  href={item.id === 'home' ? '/' : `/${item.id}`}
+                  onClick={(e) => { e.preventDefault(); handleNavClick(item.id); }}
                   title={item.label}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 relative overflow-hidden hover-shine-effect ${isActive
                       ? 'bg-[var(--bg-surface-secondary)] border-2 border-[var(--color-cyan)] text-[var(--color-cyan)] shadow-[0_0_18px_var(--glow-primary)] scale-105'
@@ -117,14 +118,15 @@ export const Sidebar: React.FC = () => {
                     }`}
                 >
                   <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-[var(--color-cyan)] drop-shadow-[0_0_6px_rgba(0,240,255,0.8)]' : ''}`} />
-                </button>
+                </a>
               );
             }
 
             return (
-              <button
+              <a
                 key={item.id}
-                onClick={() => handleNavClick(item.id)}
+                href={item.id === 'home' ? '/' : `/${item.id}`}
+                onClick={(e) => { e.preventDefault(); handleNavClick(item.id); }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-300 group text-left relative overflow-hidden hover-shine-effect ${isActive
                     ? 'bg-[var(--bg-surface-secondary)]/95 border border-[var(--color-cyan)]/85 text-white shadow-[0_0_20px_var(--glow-primary)] font-semibold'
                     : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-surface-solid)]/70 border border-transparent'
@@ -143,7 +145,7 @@ export const Sidebar: React.FC = () => {
                   </div>
                   <span className="text-sm tracking-wide truncate">{item.label}</span>
                 </div>
-              </button>
+              </a>
             );
           })}
         </div>

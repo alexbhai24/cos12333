@@ -79,7 +79,11 @@ export type PageRoute =
   | 'study-time-tracker'
   | 'marks-calculator'
   | 'exam-countdown'
-  | 'schedule-day';
+  | 'schedule-day'
+  | 'reading-practice'
+  | 'reading'
+  | 'question-practice'
+  | 'habit-radar';
 
 export type StableGrade =
   | 'class_6'

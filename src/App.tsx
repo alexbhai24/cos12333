@@ -53,6 +53,9 @@ import { StudyTimeTrackerPage } from './pages/StudyTimeTrackerPage';
 import { MarksCalculatorPage } from './pages/MarksCalculatorPage';
 import { ExamCountdownPage } from './pages/ExamCountdownPage';
 import { ScheduleDayPage } from './pages/ScheduleDayPage';
+import { BiologyReadingPage } from './pages/BiologyReadingPage';
+import { QuestionPracticePage } from './pages/QuestionPracticePage';
+import { HabitRadarPage } from './pages/HabitRadarPage';
 
 
 
@@ -182,6 +185,13 @@ const AppContent: React.FC = () => {
       case 'exam-countdown': return <ExamCountdownPage />;
       case 'schedule-day': return <ScheduleDayPage />;
       case 'reading-room': return <BooksPage />;
+      case 'reading-practice':
+      case 'reading':
+        return <BiologyReadingPage />;
+      case 'question-practice':
+        return <QuestionPracticePage />;
+      case 'habit-radar':
+        return <HabitRadarPage />;
       case 'creator-studio': return userRole === 'admin' ? <CreatorPage /> : <AccessDeniedPage />;
       case 'admin-dashboard':
       case 'admin-users':
@@ -189,6 +199,34 @@ const AppContent: React.FC = () => {
       default: return <HomePage />;
     }
   };
+
+  const isFullScreenExamRoute = currentRoute === 'nta-test' || currentRoute === 'test-instructions';
+
+  // Fullscreen distraction-free examination modes (NTA Test & Test Instructions)
+  if (isFullScreenExamRoute) {
+    return (
+      <div
+        className={`fixed inset-0 z-50 font-sans text-white select-none ${
+          currentRoute === 'nta-test'
+            ? 'h-screen overflow-hidden bg-[#0f111a]'
+            : 'min-h-screen overflow-y-auto bg-[#1c1f2e]'
+        }`}
+      >
+        {notificationMessage && (
+          <div className="fixed bottom-6 right-6 z-[9999] px-4 py-3 bg-[var(--bg-surface-solid)] border border-[var(--color-cyan)]/50 text-white text-xs font-semibold rounded-2xl shadow-2xl flex items-center space-x-2.5 backdrop-blur-xl animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-[var(--color-cyan)]/15 border border-[var(--color-cyan)]/30 flex-shrink-0">
+              <Bell className="w-3.5 h-3.5 text-[var(--color-cyan)]" />
+            </div>
+            <span className="flex-1 max-w-[220px] leading-snug">{notificationMessage}</span>
+          </div>
+        )}
+
+        <div key={currentRoute} className="w-full min-h-full animate-in fade-in duration-150 ease-out">
+          {renderRoute()}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative font-sans text-white select-none overflow-x-hidden">
@@ -213,12 +251,13 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main
-        className={`relative z-10 pt-20 pb-28 lg:pb-12 px-4 sm:px-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
-          }`}
+        className={`relative z-10 pt-20 pb-28 lg:pb-12 px-4 sm:px-8 transition-[padding] duration-200 ease-out ${
+          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        }`}
       >
         <div className="max-w-[1366px] mx-auto">
-          {/* key triggers re-mount for smooth page transition */}
-          <div key={currentRoute} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* key triggers smooth hardware-accelerated fade transition */}
+          <div key={currentRoute} className="w-full h-full animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
             {renderRoute()}
           </div>
         </div>

@@ -8,12 +8,19 @@ export const TestInstructionsPage: React.FC = () => {
 
   const handleStart = () => {
     if (isChecked) {
-      setCurrentRoute('nta-test');
+      const segments = window.location.pathname.split('/');
+      let testId = new URLSearchParams(window.location.search).get('testId');
+      if (!testId && segments.includes('instructions')) {
+         testId = segments[segments.indexOf('instructions') + 1];
+      }
+      if (!testId) testId = localStorage.getItem('active_test_id') || '';
+
+      setCurrentRoute('nta-test', '', `/tools/mock-tests/active/${testId}`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#1c1f2e] text-white/80 p-4 sm:p-8 animate-in fade-in duration-300">
+    <div className="min-h-screen bg-[#1c1f2e] text-white/80 p-4 sm:p-8">
       <div className="max-w-5xl mx-auto bg-[#232736] rounded-xl border border-white/5 shadow-2xl overflow-hidden">
         
         {/* Header */}
@@ -114,7 +121,7 @@ export const TestInstructionsPage: React.FC = () => {
           <button 
             onClick={handleStart}
             disabled={!isChecked}
-            className="px-6 py-2.5 rounded text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 rounded text-sm font-bold transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             style={{ 
               background: isChecked ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : '#1c1f2e',
               color: isChecked ? '#fff' : 'rgba(255,255,255,0.4)',

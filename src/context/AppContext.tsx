@@ -23,7 +23,7 @@ import { focusClockService } from '../services/focusClockService';
 
 interface AppContextType {
   currentRoute: PageRoute;
-  setCurrentRoute: (route: PageRoute) => void;
+  setCurrentRoute: (route: PageRoute, searchParams?: string, customPath?: string) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
   background: BackgroundType;
@@ -95,50 +95,62 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const parsePathToRoute = (pathStr: string): PageRoute => {
+  const p = pathStr.replace(/^\/+/, '').split('?')[0];
+  if (!p) return 'home';
+
+  if (p.startsWith('creator-studio')) return 'creator-studio';
+  if (p.startsWith('tools/mock-tests/instructions')) return 'test-instructions';
+  if (p.startsWith('tools/mock-tests/active')) return 'nta-test';
+  if (p.startsWith('tools/mock-tests/results')) return 'nta-test';
+  if (p.startsWith('tools/mock-tests')) return 'mock-tests';
+  if (p.startsWith('tools/pyq')) return 'pyq';
+  if (p.startsWith('tools/syllabus-tracker')) return 'syllabus-tracker';
+  if (p.startsWith('tools/mistake-tracker')) return 'mistake-tracker';
+  if (p.startsWith('tools/flashcards')) return 'flashcards';
+  if (p.startsWith('tools/study-time-tracker')) return 'study-time-tracker';
+  if (p.startsWith('tools/marks-calculator')) return 'marks-calculator';
+  if (p.startsWith('tools/exam-countdown')) return 'exam-countdown';
+  if (p.startsWith('tools/sleep-cycle')) return 'sleep-cycle';
+  if (p.startsWith('tools/reading-practice')) return 'reading-practice';
+  if (p.startsWith('tools/schedule-day')) return 'schedule-day';
+  if (p.startsWith('tools/habit-radar') || p.startsWith('tools/habits') || p.startsWith('habit-radar')) return 'habit-radar';
+
+  return p.split('/')[0] as PageRoute;
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRoute, setCurrentRouteState] = useState<PageRoute>(() => {
-    // 1. Check if there's a legacy hash URL
     const hash = window.location.hash.substring(1);
     if (hash) {
-      const cleanHash = hash.split('?')[0] as PageRoute;
-      return cleanHash;
+      return parsePathToRoute(hash);
     }
-    // 2. Otherwise use path
-    const path = window.location.pathname.substring(1).split('?')[0] as PageRoute;
-    if (path) return path;
-    return 'home';
+    return parsePathToRoute(window.location.pathname);
   });
 
-  const setCurrentRoute = (route: PageRoute) => {
+  const setCurrentRoute = (route: PageRoute, searchParams?: string, customPath?: string) => {
     setCurrentRouteState(route);
-    const path = route === 'home' ? '/' : `/${route}`;
-    if (window.location.pathname !== path) {
-      window.history.pushState(null, '', path + window.location.search);
+    const path = customPath || (route === 'home' ? '/' : `/${route}`);
+    const search = searchParams !== undefined ? searchParams : '';
+    if (window.location.pathname !== path || window.location.search !== search) {
+      window.history.pushState(null, '', path + search);
     }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   };
 
   useEffect(() => {
-    // Clean up URL if we loaded via hash or if pathname is wrong
-    const hash = window.location.hash.substring(1);
-    const path = currentRoute === 'home' ? '/' : `/${currentRoute}`;
-    if (hash || window.location.pathname !== path) {
-      window.history.replaceState(null, '', path + window.location.search);
-    }
-
     const handlePopState = () => {
-      // Re-evaluate on back/forward buttons
       const hash = window.location.hash.substring(1);
       if (hash) {
-        setCurrentRouteState(hash.split('?')[0] as PageRoute);
+        setCurrentRouteState(parsePathToRoute(hash));
         return;
       }
-      const path = window.location.pathname.substring(1).split('?')[0] as PageRoute;
-      setCurrentRouteState(path || 'home');
+      setCurrentRouteState(parsePathToRoute(window.location.pathname));
     };
     
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [currentRoute]);
+  }, []);
 
   const [theme, setThemeState] = useState<Theme>(() => {
     return (localStorage.getItem('cosmicbone_theme') as Theme) || 'dark-black';
