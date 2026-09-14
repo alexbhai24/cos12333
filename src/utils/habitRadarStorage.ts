@@ -40,14 +40,14 @@ export const habitRadarStorage = {
   getHabits(): Habit[] {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.HABITS);
-      if (stored) {
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
     } catch {}
-    // Seed initial habits and create a couple of sample completions for authentic feel
+    // Seed initial habits only on very first launch when key doesn't exist
     this.saveHabits(DEFAULT_HABITS);
     this.seedInitialLogs();
     return DEFAULT_HABITS;
@@ -203,4 +203,58 @@ export const habitRadarStorage = {
     if (!habitLogs) return 0;
     return Object.values(habitLogs).filter(l => l.completed).length;
   },
+
+  // Export full backup as JSON
+  exportBackup(): string {
+    const backup = {
+      habits: this.getHabits(),
+      logs: this.getLogs(),
+      settings: this.getSettings(),
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+    };
+    return JSON.stringify(backup, null, 2);
+  },
+
+  // Import full backup JSON
+  importBackup(jsonData: string): { success: boolean; error?: string } {
+    try {
+      const parsed = JSON.parse(jsonData);
+      if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed.habits)) {
+          this.saveHabits(parsed.habits);
+        }
+        if (parsed.logs && typeof parsed.logs === 'object') {
+          this.saveLogs(parsed.logs);
+        }
+        if (parsed.settings && typeof parsed.settings === 'object') {
+          this.saveSettings({ ...DEFAULT_SETTINGS, ...parsed.settings });
+        }
+        return { success: true };
+      }
+      return { success: false, error: 'Invalid backup file format' };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Failed to parse JSON file' };
+    }
+  },
+
+  // Clear all habits and progress
+  clearAllData() {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.HABITS);
+      localStorage.removeItem(STORAGE_KEYS.LOGS);
+      localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify({}));
+    } catch (e) {
+      console.error('Failed to clear data:', e);
+    }
+  },
+
+  // Restore default pre-existing sample habits
+  restoreDefaultHabits() {
+    this.saveHabits(DEFAULT_HABITS);
+    this.seedInitialLogs();
+    return DEFAULT_HABITS;
+  },
 };
+

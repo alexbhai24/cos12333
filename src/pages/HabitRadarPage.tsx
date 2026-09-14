@@ -229,6 +229,21 @@ export const HabitRadarPage: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+        habits={habits}
+        onEditHabit={habit => {
+          setEditingHabit(habit);
+          setIsCreateModalOpen(true);
+        }}
+        onDeleteHabit={handleDeleteHabit}
+        onCreateHabit={() => {
+          setEditingHabit(null);
+          setIsCreateModalOpen(true);
+        }}
+        onDataRefresh={() => {
+          setHabits(habitRadarStorage.getHabits());
+          setLogs(habitRadarStorage.getLogs());
+          setSettings(habitRadarStorage.getSettings());
+        }}
       />
 
       <HabitTimerModal
