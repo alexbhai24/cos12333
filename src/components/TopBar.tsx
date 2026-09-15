@@ -25,6 +25,7 @@ import { teacherRequestService } from '../services/teacherRequestService';
 
 export const TopBar: React.FC = () => {
   const {
+    currentRoute,
     user,
     theme,
     setTheme,
@@ -53,8 +54,17 @@ export const TopBar: React.FC = () => {
 
   const [themePopoverOpen, setThemePopoverOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const themeRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -109,13 +119,19 @@ export const TopBar: React.FC = () => {
     setTheme(themes[nextIdx].id);
   };
 
+  const isHomeAtTop = currentRoute === 'home' && !isScrolled;
+
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-40 pl-2.5 pr-4 sm:px-6 flex items-center justify-between">
+    <header className={`fixed top-0 left-0 right-0 h-16 z-40 pl-2.5 pr-4 sm:px-6 flex items-center justify-between transition-all duration-300 border-b ${
+      isHomeAtTop
+        ? 'bg-[var(--bg-sidebar)] border-[var(--border-color)] shadow-[0_4px_30px_rgba(0,0,0,0.4)]'
+        : 'bg-transparent border-transparent shadow-none pointer-events-none'
+    }`}>
       {/* Left side: Logo & Mobile Toggle */}
-      <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-1 pointer-events-auto">
         <button
           onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-          className="lg:hidden text-[var(--text-secondary)] hover:text-white p-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)]"
+          className="lg:hidden text-[var(--text-secondary)] hover:text-white p-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan)] bg-[var(--bg-surface-solid)]/80 border border-[var(--border-color)]"
           aria-label="Toggle Navigation Menu"
         >
           {mobileDrawerOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
@@ -124,7 +140,9 @@ export const TopBar: React.FC = () => {
         {/* Brand Logo & Title */}
         <div
           onClick={() => setCurrentRoute('home')}
-          className="flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none group text-left"
+          className={`flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none group text-left transition-all duration-300 ${
+            isHomeAtTop ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
+          }`}
         >
           <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-lg border border-white/20 flex-shrink-0">
             <img
@@ -143,16 +161,10 @@ export const TopBar: React.FC = () => {
           </div>
         </div>
 
-        {/* Desktop Search Bar & Bookmark */}
-        <div className="hidden md:flex items-center flex-1 max-w-xs xl:max-w-sm ml-4 gap-2.5">
-          <button
-            onClick={() => setIsSavedItemsOpen(true)}
-            className="p-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-gray-400 hover:text-[var(--color-cyan)] transition-all shadow-md active:scale-95 flex items-center justify-center flex-shrink-0"
-            title="Open Learning Library (Saved Items) 🔖"
-          >
-            <Bookmark className="w-4 h-4 text-[var(--color-cyan)]" />
-          </button>
-
+        {/* Desktop Search Bar */}
+        <div className={`hidden md:flex items-center flex-1 max-w-xs xl:max-w-sm ml-4 gap-2.5 transition-all duration-300 ${
+          isHomeAtTop ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
+        }`}>
           <button
             onClick={() => setIsSearchOpen(true)}
             className="w-full flex items-center justify-between px-3.5 py-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-xs text-gray-400 hover:text-white transition-all shadow-md cursor-pointer active:scale-98"
@@ -172,7 +184,7 @@ export const TopBar: React.FC = () => {
 
 
       {/* Right side: Streak, Apples, Profile */}
-      <div className="flex items-center space-x-1.5 sm:space-x-3 flex-shrink-0">
+      <div className="flex items-center space-x-1.5 sm:space-x-3 flex-shrink-0 pointer-events-auto">
 
         <DotLoader isLoading={authLoading} />
 
@@ -258,7 +270,6 @@ export const TopBar: React.FC = () => {
             </AvatarDecoration>
             <div className="hidden lg:block text-left pr-1">
               <div className="text-xs font-semibold text-white leading-tight">{user.name}</div>
-              <div className="text-[10px] text-[var(--text-muted)] leading-tight">{user.email}</div>
             </div>
           </button>
 

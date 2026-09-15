@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Home,
   Video,
+  MessageSquare,
   Wrench,
   ScanLine,
   Camera,
@@ -38,11 +39,12 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-export const BOTTOM_BAR_ROUTES: PageRoute[] = ['home', 'videos', 'tools'];
+export const BOTTOM_BAR_ROUTES: PageRoute[] = ['home', 'videos', 'posts', 'tools'];
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'home',   label: 'Home',  icon: Home },
   { id: 'videos', label: 'Video', icon: Video },
+  { id: 'posts',  label: 'Posts', icon: MessageSquare },
   { id: 'tools',  label: 'Tools', icon: Wrench },
 ];
 
@@ -63,10 +65,14 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   // Captured raw image vs cropped final image
   const [rawImage, setRawImage] = useState<string | null>(null);
   const [croppedImage, setCroppedImage] = useState<string | null>(null);
-  const [rotation, setRotation] = useState(0);
+  const [rotation, setRotation] = useState<number>(0);
 
   // Crop box bounding rectangle percentages (x, y, w, h)
   const [cropBox, setCropBox] = useState({ x: 0.05, y: 0.08, w: 0.9, h: 0.82 });
+
+  // Dragging handles: corner, edge, or whole box move
+  const [draggingHandle, setDraggingHandle] = useState<'tl' | 'tr' | 'br' | 'bl' | 'top' | 'right' | 'bottom' | 'left' | 'move' | null>(null);
+  const [dragStart, setDragStart] = useState<{ relX: number; relY: number; boxX: number; boxY: number } | null>(null);
 
   // Form Fields
   const [note, setNote]       = useState('');
@@ -87,6 +93,50 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     h: number;
     confidence: number;
   }>({ isDetected: false, x: 0.05, y: 0.08, w: 0.9, h: 0.82, confidence: 0 });
+
+  // Aggressive camera hardware stream kill function
+  const stopCamera = () => {
+    try {
+      if (videoRef.current) {
+        if (videoRef.current.srcObject) {
+          const s = videoRef.current.srcObject as MediaStream;
+          s.getTracks().forEach(track => {
+            try {
+              track.stop();
+              track.enabled = false;
+            } catch {}
+          });
+          videoRef.current.srcObject = null;
+        }
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          try {
+            track.stop();
+            track.enabled = false;
+          } catch {}
+        });
+        setStream(null);
+      }
+    } catch (e) {
+      console.warn('Camera stop error:', e);
+    }
+    setFlashlightOn(false);
+    setHasCamera(false);
+  };
+
+  // Close scanner and ensure 100% hardware camera light kill
+  const handleClose = () => {
+    stopCamera();
+    onClose();
+  };
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   // Real-time camera detection loop (runs while in Step 1)
   useEffect(() => {
@@ -186,23 +236,22 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     if (step === 1) {
       initCamera();
+    } else {
+      stopCamera();
     }
 
     return () => {
       isMounted = false;
       if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
+        currentStream.getTracks().forEach(track => {
+          try {
+            track.stop();
+            track.enabled = false;
+          } catch {}
+        });
       }
     };
   }, [step]);
-
-  useEffect(() => {
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [stream]);
 
   // Flashlight toggle handler
   const toggleFlashlight = async () => {
@@ -221,8 +270,6 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       }
     }
   };
-
-  const [draggingCorner, setDraggingCorner] = useState<'tl' | 'tr' | 'br' | 'bl' | null>(null);
 
   // Capture video frame from camera & proceed to Crop Screen
   const captureFrameToCrop = () => {
@@ -252,15 +299,11 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
         setRawImage(dataUrl);
+        setRotation(0);
 
-        if (stream) {
-          stream.getTracks().forEach(track => {
-            track.stop();
-            track.enabled = false;
-          });
-          setStream(null);
-        }
-        setStep(2); // Smoothly proceed to Step 2 Crop Screen
+        // Turn off camera hardware light immediately upon capturing frame
+        stopCamera();
+        setStep(2);
       }
     }
   };
@@ -273,13 +316,8 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     reader.onloadend = () => {
       setRawImage(reader.result as string);
       setCropBox({ x: 0.05, y: 0.08, w: 0.9, h: 0.82 });
-      if (stream) {
-        stream.getTracks().forEach(track => {
-          track.stop();
-          track.enabled = false;
-        });
-        setStream(null);
-      }
+      setRotation(0);
+      stopCamera();
       setStep(2);
     };
     reader.readAsDataURL(f);
@@ -295,31 +333,52 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
+      const srcW = img.width;
+      const srcH = img.height;
+
+      // Handle rotation transformations
+      const rotCanvas = document.createElement('canvas');
+      const rotCtx = rotCanvas.getContext('2d');
+      if (!rotCtx) {
         setCroppedImage(rawImage);
         setStep(3);
         return;
       }
 
+      if (rotation === 90 || rotation === 270) {
+        rotCanvas.width = srcH;
+        rotCanvas.height = srcW;
+      } else {
+        rotCanvas.width = srcW;
+        rotCanvas.height = srcH;
+      }
+
+      rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+      rotCtx.rotate((rotation * Math.PI) / 180);
+      rotCtx.drawImage(img, -srcW / 2, -srcH / 2);
+
       // Crop coordinates based on cropBox percentage
-      const cropX = img.width * cropBox.x;
-      const cropY = img.height * cropBox.y;
-      const cropW = Math.max(img.width * cropBox.w, 50);
-      const cropH = Math.max(img.height * cropBox.h, 50);
+      const cropX = rotCanvas.width * cropBox.x;
+      const cropY = rotCanvas.height * cropBox.y;
+      const cropW = Math.max(rotCanvas.width * cropBox.w, 40);
+      const cropH = Math.max(rotCanvas.height * cropBox.h, 40);
 
-      canvas.width = cropW;
-      canvas.height = cropH;
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = cropW;
+      finalCanvas.height = cropH;
+      const finalCtx = finalCanvas.getContext('2d');
 
-      ctx.drawImage(
-        img,
-        cropX, cropY, cropW, cropH,
-        0, 0, cropW, cropH
-      );
-
-      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
-      setCroppedImage(croppedUrl);
+      if (finalCtx) {
+        finalCtx.drawImage(
+          rotCanvas,
+          cropX, cropY, cropW, cropH,
+          0, 0, cropW, cropH
+        );
+        const croppedUrl = finalCanvas.toDataURL('image/jpeg', 0.92);
+        setCroppedImage(croppedUrl);
+      } else {
+        setCroppedImage(rawImage);
+      }
       setStep(3); // Proceed to Syllabus & Details Step
     };
     img.onerror = () => {
@@ -336,18 +395,6 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Close modal & stop camera/mic streams immediately
-  const handleClose = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => {
-        track.stop();
-        track.enabled = false;
-      });
-      setStream(null);
-    }
-    onClose();
   };
 
   const handleSave = () => {
@@ -398,24 +445,32 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   return (
     <>
+      <style>{`
+        @keyframes scanLaserBeam {
+          0% { top: 4%; opacity: 0.3; }
+          50% { top: 92%; opacity: 1; }
+          100% { top: 4%; opacity: 0.3; }
+        }
+      `}</style>
+      
       {/* Fullscreen Overlay */}
-      <div className="fixed inset-0 z-[99999] bg-[#0a0c16] flex flex-col justify-between select-none font-sans overflow-hidden">
+      <div className="fixed inset-0 z-[99999] bg-[#070913] flex flex-col justify-between select-none font-sans overflow-hidden">
         
-        {/* STEP 1: REAL LIVE CAMERA SCANNER VIEW (MATCHING USER SCREENSHOT IMAGE 1) */}
+        {/* STEP 1: 1:1 RATIO LIVE SCANNER WITH LASER SCANNING BEAM */}
         {step === 1 && (
           <div className="relative w-full h-full flex flex-col justify-between p-4 bg-black">
             
-            {/* Top Bar: Close Button & Flashlight/QR Tools */}
+            {/* Top Bar: Close Button & Flashlight */}
             <div className="relative z-30 flex items-center justify-between pt-2 px-2">
               <button
                 onClick={handleClose}
-                className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/80 transition-colors border border-white/10"
                 title="Close Scanner"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Tooltip: Live Auto-Detector Status Badge */}
+              {/* Live Auto-Detector Status Badge */}
               <div className={`px-4 py-1.5 rounded-full backdrop-blur-md shadow-lg border transition-all ${
                 detectedBox.isDetected
                   ? 'bg-emerald-950/80 border-emerald-400/60 text-emerald-300'
@@ -430,7 +485,7 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={toggleFlashlight}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors border border-white/10 ${
                     flashlightOn ? 'bg-amber-400 text-black' : 'bg-black/60 backdrop-blur-md text-white'
                   }`}
                 >
@@ -439,9 +494,9 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
             </div>
 
-            {/* Center Live Camera Viewfinder + Real-Time Bounding Detection Box */}
+            {/* 1:1 Ratio Square Viewfinder Frame with Animated Laser Scan Beam */}
             <div className="relative flex-1 my-3 flex items-center justify-center overflow-hidden">
-              <div className="relative w-full max-w-md h-full rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-white/10">
+              <div className="relative w-full max-w-xs aspect-square rounded-3xl overflow-hidden bg-black flex items-center justify-center border-2 border-cyan-400/40 shadow-[0_0_40px_rgba(0,240,255,0.25)]">
                 
                 {/* Live Camera Feed */}
                 <video
@@ -452,54 +507,36 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   className="absolute inset-0 w-full h-full object-cover"
                 />
 
+                {/* Animated Futuristic Laser Scan Line */}
+                <div
+                  className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_20px_#00f0ff] z-20 pointer-events-none"
+                  style={{ animation: 'scanLaserBeam 2.4s ease-in-out infinite' }}
+                />
+
                 {!hasCamera && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#18181b] text-white/60 space-y-3">
-                    <Camera className="w-12 h-12 text-amber-400 animate-pulse" />
-                    <p className="text-xs font-semibold text-white">Align question inside frame</p>
-                    <p className="text-[11px] text-white/40">Real-time document detector active</p>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#101424] text-white/60 space-y-3">
+                    <Camera className="w-12 h-12 text-cyan-400 animate-pulse" />
+                    <p className="text-xs font-semibold text-white">Align question inside 1:1 frame</p>
+                    <p className="text-[11px] text-white/50">Real-time auto-detector active</p>
                   </div>
                 )}
 
-                {/* Real-Time Auto-Detected Bounding Box & Quad Corners */}
-                {detectedBox.isDetected ? (
-                  <div
-                    className="absolute border-2 border-amber-400 bg-amber-400/15 rounded-xl pointer-events-none z-30 transition-all duration-200 shadow-[0_0_30px_rgba(251,191,36,0.6)]"
-                    style={{
-                      top: `${detectedBox.y * 100}%`,
-                      left: `${detectedBox.x * 100}%`,
-                      width: `${detectedBox.w * 100}%`,
-                      height: `${detectedBox.h * 100}%`
-                    }}
-                  >
-                    {/* Glowing 4 Corner Yellow Handles */}
-                    <div className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
-                    <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
-                    <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
-                    <div className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
-
-                    {/* Scanning Beam Light Line */}
-                    <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent animate-bounce top-1/2" />
-                  </div>
-                ) : (
-                  <div className="absolute inset-10 pointer-events-none z-30 transition-all duration-300">
-                    <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-amber-400/60 rounded-tl-lg" />
-                    <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-amber-400/60 rounded-tr-lg" />
-                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-amber-400/60 rounded-br-lg" />
-                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-amber-400/60 rounded-bl-lg" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-3 h-3 rounded-full border border-amber-400/40 bg-amber-400/20 backdrop-blur-xs" />
-                    </div>
-                  </div>
-                )}
+                {/* Corner Target Reticles */}
+                <div className="absolute inset-4 pointer-events-none z-30 transition-all duration-300">
+                  <div className="absolute top-0 left-0 w-7 h-7 border-t-3 border-l-3 border-cyan-400 rounded-tl-xl shadow-[0_0_12px_#00f0ff]" />
+                  <div className="absolute top-0 right-0 w-7 h-7 border-t-3 border-r-3 border-cyan-400 rounded-tr-xl shadow-[0_0_12px_#00f0ff]" />
+                  <div className="absolute bottom-0 right-0 w-7 h-7 border-b-3 border-r-3 border-cyan-400 rounded-br-xl shadow-[0_0_12px_#00f0ff]" />
+                  <div className="absolute bottom-0 left-0 w-7 h-7 border-b-3 border-l-3 border-cyan-400 rounded-bl-xl shadow-[0_0_12px_#00f0ff]" />
+                </div>
               </div>
             </div>
 
-            {/* Bottom Shutter Capture + Upload from Gallery Pill (MATCHING USER SCREENSHOT IMAGE 1) */}
+            {/* Bottom Shutter Capture + Upload Button */}
             <div className="relative z-30 flex flex-col items-center gap-4 pb-4">
               <button
                 onClick={captureFrameToCrop}
                 className="w-16 h-16 rounded-full bg-white p-1 shadow-2xl flex items-center justify-center active:scale-90 transition-transform"
-                title="Capture & Auto-Crop"
+                title="Capture Frame"
               >
                 <div className="w-full h-full rounded-full border-2 border-black/20 bg-white" />
               </button>
@@ -523,66 +560,145 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
 
-        {/* STEP 2: INTERACTIVE CROP & BOUNDARY ADJUSTMENT SCREEN (MATCHING USER SCREENSHOT IMAGE 2) */}
+        {/* STEP 2: RECREATED INTERACTIVE CROP TOOL WITH DRAGGABLE MOVE FUNCTION */}
         {step === 2 && (
-          <div className="relative w-full h-full flex flex-col justify-between p-4 bg-black animate-in fade-in duration-200">
-            {/* Top Bar with Back Arrow */}
-            <div className="relative z-30 flex items-center justify-between pt-2 px-2">
+          <div className="relative w-full h-full flex flex-col justify-between p-4 bg-[#070913] animate-in fade-in duration-200">
+            {/* Top Bar */}
+            <div className="relative z-30 flex items-center justify-between pt-2 px-2 border-b border-white/10 pb-3">
               <button
-                onClick={() => setStep(1)}
-                className="p-2 rounded-full text-white/80 hover:text-white"
+                onClick={() => {
+                  stopCamera();
+                  setRawImage(null);
+                  setStep(1);
+                }}
+                className="p-2 rounded-full text-white/80 hover:text-white bg-white/10 hover:bg-white/20 transition-colors"
+                title="Back to Camera"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <span className="text-xs font-bold text-white/80">Crop & Adjust Boundary</span>
-              <div className="w-6" />
+              
+              <div className="flex items-center gap-2">
+                <ScanLine className="w-4 h-4 text-amber-400" />
+                <span className="text-sm font-bold text-white">Interactive Crop & Adjust</span>
+              </div>
+
+              {/* Rotate Buttons */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setRotation((prev) => (prev + 270) % 360)}
+                  className="p-2 rounded-xl bg-white/10 text-white/80 hover:text-amber-400 hover:bg-white/20 transition-colors"
+                  title="Rotate Left"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                  className="p-2 rounded-xl bg-white/10 text-white/80 hover:text-amber-400 hover:bg-white/20 transition-colors"
+                  title="Rotate Right"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Interactive Image Container with Drag Handles */}
-            <div className="relative flex-1 my-4 flex items-center justify-center overflow-hidden">
+            {/* Presets Bar */}
+            <div className="flex items-center justify-center gap-2 py-2">
+              <button
+                type="button"
+                onClick={() => setCropBox({ x: 0.03, y: 0.03, w: 0.94, h: 0.94 })}
+                className="px-3 py-1 rounded-lg bg-white/10 text-[11px] font-semibold text-white/80 hover:bg-amber-400 hover:text-black transition-colors"
+              >
+                Full Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setCropBox({ x: 0.08, y: 0.15, w: 0.84, h: 0.55 })}
+                className="px-3 py-1 rounded-lg bg-white/10 text-[11px] font-semibold text-white/80 hover:bg-amber-400 hover:text-black transition-colors"
+              >
+                Question Box
+              </button>
+              <button
+                type="button"
+                onClick={() => setCropBox({ x: 0.08, y: 0.25, w: 0.84, h: 0.30 })}
+                className="px-3 py-1 rounded-lg bg-white/10 text-[11px] font-semibold text-white/80 hover:bg-amber-400 hover:text-black transition-colors"
+              >
+                Formula Strip
+              </button>
+            </div>
+
+            {/* Interactive Image Container with Drag-to-Move and Corner Handles */}
+            <div className="relative flex-1 my-2 flex items-center justify-center overflow-hidden">
               {rawImage && (
                 <div
-                  className="relative max-w-md w-full max-h-[65vh] flex items-center justify-center rounded-2xl overflow-hidden bg-[#0c0c0e] p-2 border border-white/10 select-none touch-none"
+                  className="relative max-w-md w-full max-h-[60vh] flex items-center justify-center rounded-2xl overflow-hidden bg-[#0a0d1a] p-2 border border-white/15 select-none touch-none shadow-2xl"
                   onPointerMove={(e) => {
-                    if (!draggingCorner) return;
+                    if (!draggingHandle) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     const relX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                     const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
 
                     setCropBox(prev => {
                       let { x, y, w, h } = prev;
-                      if (draggingCorner === 'tl') {
+                      if (draggingHandle === 'move' && dragStart) {
+                        const dx = relX - dragStart.relX;
+                        const dy = relY - dragStart.relY;
+                        const newX = Math.max(0.01, Math.min(0.99 - w, dragStart.boxX + dx));
+                        const newY = Math.max(0.01, Math.min(0.99 - h, dragStart.boxY + dy));
+                        return { ...prev, x: newX, y: newY };
+                      }
+                      if (draggingHandle === 'tl') {
                         const newW = (x + w) - relX;
                         const newH = (y + h) - relY;
-                        if (newW > 0.1 && newH > 0.1) { x = relX; y = relY; w = newW; h = newH; }
-                      } else if (draggingCorner === 'tr') {
+                        if (newW > 0.08 && newH > 0.08) { x = relX; y = relY; w = newW; h = newH; }
+                      } else if (draggingHandle === 'tr') {
                         const newW = relX - x;
                         const newH = (y + h) - relY;
-                        if (newW > 0.1 && newH > 0.1) { y = relY; w = newW; h = newH; }
-                      } else if (draggingCorner === 'br') {
+                        if (newW > 0.08 && newH > 0.08) { y = relY; w = newW; h = newH; }
+                      } else if (draggingHandle === 'br') {
                         const newW = relX - x;
                         const newH = relY - y;
-                        if (newW > 0.1 && newH > 0.1) { w = newW; h = newH; }
-                      } else if (draggingCorner === 'bl') {
+                        if (newW > 0.08 && newH > 0.08) { w = newW; h = newH; }
+                      } else if (draggingHandle === 'bl') {
                         const newW = (x + w) - relX;
                         const newH = relY - y;
-                        if (newW > 0.1 && newH > 0.1) { x = relX; w = newW; h = newH; }
+                        if (newW > 0.08 && newH > 0.08) { x = relX; w = newW; h = newH; }
+                      } else if (draggingHandle === 'top') {
+                        const newH = (y + h) - relY;
+                        if (newH > 0.08) { y = relY; h = newH; }
+                      } else if (draggingHandle === 'bottom') {
+                        const newH = relY - y;
+                        if (newH > 0.08) { h = newH; }
+                      } else if (draggingHandle === 'left') {
+                        const newW = (x + w) - relX;
+                        if (newW > 0.08) { x = relX; w = newW; }
+                      } else if (draggingHandle === 'right') {
+                        const newW = relX - x;
+                        if (newW > 0.08) { w = newW; }
                       }
                       return { x, y, w, h };
                     });
                   }}
-                  onPointerUp={() => setDraggingCorner(null)}
-                  onPointerLeave={() => setDraggingCorner(null)}
+                  onPointerUp={() => {
+                    setDraggingHandle(null);
+                    setDragStart(null);
+                  }}
+                  onPointerLeave={() => {
+                    setDraggingHandle(null);
+                    setDragStart(null);
+                  }}
                 >
                   <img
                     src={rawImage}
                     alt="Captured for crop"
-                    className="max-h-[60vh] max-w-full object-contain rounded-xl pointer-events-none"
+                    style={{ transform: `rotate(${rotation}deg)` }}
+                    className="max-h-[55vh] max-w-full object-contain rounded-xl pointer-events-none transition-transform duration-200"
                   />
 
                   {/* Interactive Crop Boundary Box */}
                   <div
-                    className="absolute border-2 border-amber-400 rounded-xl shadow-[0_0_25px_rgba(251,191,36,0.6)]"
+                    className="absolute border-2 border-amber-400 rounded-xl shadow-[0_0_30px_rgba(251,191,36,0.6)] pointer-events-auto cursor-move"
                     style={{
                       top: `${cropBox.y * 100}%`,
                       left: `${cropBox.x * 100}%`,
@@ -590,54 +706,104 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       height: `${cropBox.h * 100}%`
                     }}
                   >
+                    {/* Draggable Center Move Body */}
+                    <div
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                        if (rect) {
+                          const relX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                          const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                          setDragStart({ relX, relY, boxX: cropBox.x, boxY: cropBox.y });
+                        }
+                        setDraggingHandle('move');
+                      }}
+                      className="absolute inset-0 z-10 cursor-move"
+                    />
+
+                    {/* Grid Rule-of-Thirds Lines */}
+                    <div className="absolute inset-0 pointer-events-none opacity-30 grid grid-cols-3 grid-rows-3">
+                      <div className="border-r border-amber-300" />
+                      <div className="border-r border-amber-300" />
+                      <div />
+                      <div className="border-t border-r border-amber-300" />
+                      <div className="border-t border-r border-amber-300" />
+                      <div className="border-t border-amber-300" />
+                      <div className="border-t border-r border-amber-300" />
+                      <div className="border-t border-r border-amber-300" />
+                      <div className="border-t border-amber-300" />
+                    </div>
+
                     {/* 4 Interactive Corner Drag Handles */}
                     <div
-                      onPointerDown={(e) => { e.stopPropagation(); setDraggingCorner('tl'); }}
-                      className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-xl cursor-nwse-resize touch-none flex items-center justify-center active:scale-125 transition-transform"
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('tl'); }}
+                      className="absolute -top-3.5 -left-3.5 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-2xl cursor-nwse-resize touch-none flex items-center justify-center active:scale-125 transition-transform z-20"
                     />
                     <div
-                      onPointerDown={(e) => { e.stopPropagation(); setDraggingCorner('tr'); }}
-                      className="absolute -top-3 -right-3 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-xl cursor-nesw-resize touch-none flex items-center justify-center active:scale-125 transition-transform"
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('tr'); }}
+                      className="absolute -top-3.5 -right-3.5 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-2xl cursor-nesw-resize touch-none flex items-center justify-center active:scale-125 transition-transform z-20"
                     />
                     <div
-                      onPointerDown={(e) => { e.stopPropagation(); setDraggingCorner('br'); }}
-                      className="absolute -bottom-3 -right-3 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-xl cursor-nwse-resize touch-none flex items-center justify-center active:scale-125 transition-transform"
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('br'); }}
+                      className="absolute -bottom-3.5 -right-3.5 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-2xl cursor-nwse-resize touch-none flex items-center justify-center active:scale-125 transition-transform z-20"
                     />
                     <div
-                      onPointerDown={(e) => { e.stopPropagation(); setDraggingCorner('bl'); }}
-                      className="absolute -bottom-3 -left-3 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-xl cursor-nesw-resize touch-none flex items-center justify-center active:scale-125 transition-transform"
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('bl'); }}
+                      className="absolute -bottom-3.5 -left-3.5 w-7 h-7 rounded-full bg-amber-400 border-2 border-white shadow-2xl cursor-nesw-resize touch-none flex items-center justify-center active:scale-125 transition-transform z-20"
+                    />
+
+                    {/* 4 Edge Handles */}
+                    <div
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('top'); }}
+                      className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-3 rounded-full bg-amber-400 border border-white cursor-ns-resize touch-none z-20"
+                    />
+                    <div
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('bottom'); }}
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-3 rounded-full bg-amber-400 border border-white cursor-ns-resize touch-none z-20"
+                    />
+                    <div
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('left'); }}
+                      className="absolute top-1/2 -left-2 -translate-y-1/2 w-3 h-8 rounded-full bg-amber-400 border border-white cursor-ew-resize touch-none z-20"
+                    />
+                    <div
+                      onPointerDown={(e) => { e.stopPropagation(); setDraggingHandle('right'); }}
+                      className="absolute top-1/2 -right-2 -translate-y-1/2 w-3 h-8 rounded-full bg-amber-400 border border-white cursor-ew-resize touch-none z-20"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Retake & Save Action Bar */}
-            <div className="relative z-30 flex flex-col items-center gap-4 pb-4">
-
-              {/* Retake (Left) & Save (Right) Text Buttons (MATCHING USER SCREENSHOT IMAGE 2) */}
-              <div className="w-full flex items-center justify-between px-8 pt-2">
+            {/* Action Bar */}
+            <div className="relative z-30 flex flex-col items-center gap-3 pb-3">
+              <div className="w-full flex items-center justify-between px-6 pt-2">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
-                  className="text-white/80 hover:text-white text-base font-semibold transition-colors"
+                  onClick={() => {
+                    stopCamera();
+                    setRawImage(null);
+                    setStep(1);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-all flex items-center gap-2"
                 >
-                  Retake
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Retake Scan</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={applyCropAndProceed}
-                  className="text-white font-bold text-base hover:text-amber-400 transition-colors"
+                  className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-black font-bold text-xs shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
                 >
-                  Save
+                  <span>Crop & Continue</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 3: SYLLABUS MAPPING & SOLUTION DETAILS (MATCHING USER SCREENSHOT IMAGE 3) */}
+        {/* STEP 3: DETAILS & ADAPTIVE ASPECT RATIO PREVIEW (FIXES USER SCREENSHOT LETTERBOXING) */}
         {step === 3 && (
           <div className="relative w-full h-full flex flex-col justify-between p-5 overflow-y-auto custom-scrollbar bg-[#0d1226]">
             
@@ -648,7 +814,7 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <span className="text-white font-bold text-base">Add to Error Book</span>
               </div>
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="p-1.5 rounded-full bg-white/10 text-white/70 hover:text-white"
               >
                 <X className="w-5 h-5" />
@@ -656,39 +822,55 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </div>
 
             <div className="my-4 space-y-4">
-              {/* Cropped Photo Preview with View Full & Download Overlay Icons */}
+              {/* ADAPTIVE CROPPED PHOTO PREVIEW (MATCHES EXACT CROPPED IMAGE ASPECT RATIO NO BLACK SIDE BARS) */}
               {croppedImage && (
-                <div className="relative w-full rounded-2xl overflow-hidden bg-[#0c0f1d] border border-white/15 max-h-56 flex items-center justify-center">
-                  <img src={croppedImage} alt="Cropped preview" className="w-full max-h-56 object-contain rounded-2xl" />
+                <div className="flex flex-col items-center justify-center my-1">
+                  <div className="relative group inline-block max-w-full rounded-2xl overflow-hidden border border-cyan-400/40 shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+                    <img
+                      src={croppedImage}
+                      alt="Cropped preview"
+                      className="max-h-64 max-w-full w-auto h-auto object-contain rounded-2xl block"
+                    />
 
-                  {/* Centered Download Button Icon matching Image 3 */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleDownloadImage(croppedImage)}
-                      className="w-12 h-12 rounded-full bg-amber-400/90 text-black flex items-center justify-center shadow-2xl"
-                    >
-                      <Download className="w-6 h-6" />
-                    </button>
-                  </div>
+                    {/* Centered Download / Lightbox Hover Bar */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setLightboxImage(croppedImage)}
+                        className="w-10 h-10 rounded-full bg-cyan-400 text-black flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+                        title="See Full / View Image"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadImage(croppedImage)}
+                        className="w-10 h-10 rounded-full bg-amber-400 text-black flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+                        title="Download Image"
+                      >
+                        <Download className="w-5 h-5" />
+                      </button>
+                    </div>
 
-                  {/* Top-Right Overlay Icons */}
-                  <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20">
-                    <button
-                      type="button"
-                      onClick={() => setLightboxImage(croppedImage)}
-                      className="p-1 text-white/80 hover:text-cyan-400 transition-colors"
-                      title="See Full / View Image"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadImage(croppedImage)}
-                      className="p-1 text-white/80 hover:text-emerald-400 transition-colors"
-                      title="Download Image"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
+                    {/* Top-Right Quick Badge */}
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20">
+                      <button
+                        type="button"
+                        onClick={() => setLightboxImage(croppedImage)}
+                        className="p-1 text-white/80 hover:text-cyan-400 transition-colors"
+                        title="See Full / View Image"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadImage(croppedImage)}
+                        className="p-1 text-white/80 hover:text-emerald-400 transition-colors"
+                        title="Download Image"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -873,6 +1055,14 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 };
 
 // ── Main Component ─────────────────────────────────────────────────────────────
+const triggerHaptic = (pattern: number | number[] = 15) => {
+  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+    } catch {}
+  }
+};
+
 export const MobileBottomNav: React.FC = () => {
   const { currentRoute, setCurrentRoute } = useApp();
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -882,6 +1072,7 @@ export const MobileBottomNav: React.FC = () => {
   }
 
   const handleNav = (id: PageRoute) => {
+    triggerHaptic(12);
     setCurrentRoute(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -896,7 +1087,7 @@ export const MobileBottomNav: React.FC = () => {
         className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[9000] lg:hidden flex items-center gap-3"
         style={{ width: 'calc(100vw - 32px)', maxWidth: '420px' }}
       >
-        {/* ── Dark pill with 3 nav items ── */}
+        {/* ── Dark pill with 4 nav items ── */}
         <nav
           className="flex-1 flex items-center px-2 py-2 rounded-[2rem] backdrop-blur-2xl"
           style={{
@@ -949,30 +1140,57 @@ export const MobileBottomNav: React.FC = () => {
           })}
         </nav>
 
-        {/* ── Scanner circle button ── */}
+        {/* ── Scanner circle button with upgraded glowing logo & haptic vibration ── */}
         <button
-          onClick={() => setScannerOpen(true)}
+          onClick={() => {
+            triggerHaptic([18, 35, 18]);
+            setScannerOpen(true);
+          }}
           aria-label="Scan and add to Error Book"
-          className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 active:scale-90 outline-none select-none"
+          className="group relative flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-300 active:scale-90 hover:scale-105 outline-none select-none overflow-hidden"
           style={{
             width: '58px',
             height: '58px',
-            background: 'rgba(8,10,22,0.90)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
+            background: 'linear-gradient(135deg, rgba(16,22,40,0.95) 0%, rgba(8,10,22,0.98) 100%)',
+            border: '1px solid rgba(0,240,255,0.25)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.65), 0 0 20px rgba(0,240,255,0.2), inset 0 1px 1px rgba(255,255,255,0.15)',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
+          {/* Subtle glowing ambient background pulse */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/10 via-amber-500/10 to-purple-500/10 opacity-70 group-hover:opacity-100 transition-opacity" />
+
+          {/* Upgraded Futuristic Scanner Logo */}
           <svg
-            width="26" height="26" viewBox="0 0 26 26" fill="none"
+            width="28" height="28" viewBox="0 0 28 28" fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            style={{ color: 'rgba(255,255,255,0.75)' }}
+            className="relative z-10 transition-transform duration-300 group-hover:scale-110"
           >
-            <path d="M4 9V4h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M22 9V4h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M4 17v5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M22 17v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M13 10v6M10 13h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <defs>
+              <linearGradient id="scannerLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00f0ff" />
+                <stop offset="50%" stopColor="#38bdf8" />
+                <stop offset="100%" stopColor="#fbbf24" />
+              </linearGradient>
+            </defs>
+            
+            {/* Top-Left Corner Bracket */}
+            <path d="M4 10V5.5C4 4.67157 4.67157 4 5.5 4H10" stroke="url(#scannerLogoGrad)" strokeWidth="2.2" strokeLinecap="round"/>
+            
+            {/* Top-Right Corner Bracket */}
+            <path d="M24 10V5.5C24 4.67157 23.3284 4 22.5 4H18" stroke="url(#scannerLogoGrad)" strokeWidth="2.2" strokeLinecap="round"/>
+            
+            {/* Bottom-Right Corner Bracket */}
+            <path d="M24 18V22.5C24 23.3284 23.3284 24 22.5 24H18" stroke="url(#scannerLogoGrad)" strokeWidth="2.2" strokeLinecap="round"/>
+            
+            {/* Bottom-Left Corner Bracket */}
+            <path d="M4 18V22.5C4 23.3284 4.67157 24 5.5 24H10" stroke="url(#scannerLogoGrad)" strokeWidth="2.2" strokeLinecap="round"/>
+            
+            {/* Center Laser Beam Line */}
+            <line x1="7" y1="14" x2="21" y2="14" stroke="url(#scannerLogoGrad)" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="1 0.5" />
+            
+            {/* Plus / Target Center Reticle */}
+            <circle cx="14" cy="14" r="2.5" fill="url(#scannerLogoGrad)" />
           </svg>
         </button>
       </div>

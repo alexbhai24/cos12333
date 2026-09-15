@@ -4,7 +4,6 @@ import {
   Send,
   Users,
   CheckCircle,
-  Sparkles,
   Wifi,
   Trash2
 } from 'lucide-react';
@@ -79,37 +78,6 @@ export const StudyRoomsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-12">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#06101F] via-[#09182D] to-[#120826] p-6 rounded-3xl border border-[rgba(0,240,255,0.2)] shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-72 h-72 bg-[#00F0FF]/10 rounded-full filter blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Private Academic Communities</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading">
-              Active Study Rooms
-            </h1>
-            <p className="text-xs text-gray-400 mt-1 max-w-xl">
-              Connect and collaborate with verified peers in your grade level. Access is restricted by academic level and teacher designation.
-            </p>
-          </div>
-
-          <div className="bg-[#040716] p-3.5 rounded-2xl border border-white/10 text-right">
-            <div className="text-[10px] text-gray-400 font-bold uppercase">Your Academic Level</div>
-            <div className="text-xs font-extrabold text-[#00F0FF] mt-0.5">
-              {user.isAdmin
-                ? 'Owner Admin (All Access)'
-                : user.userType === 'teacher'
-                ? `${user.teacherDesignation || 'Teacher'} 🎓`
-                : `${getGradeLabel(user.gradeLevel)} Student 🎒`}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Grid: Room Sidebar & Chat Stream */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px]">
         {/* Left: Rooms List */}

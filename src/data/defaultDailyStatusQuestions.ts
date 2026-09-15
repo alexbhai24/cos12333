@@ -65,7 +65,7 @@ export const DEFAULT_DAILY_QUESTIONS: Record<SubjectKey, DailyQuestion[]> = {
         'Its average speed is u'
       ],
       correctIndex: 0,
-      explanation: 'The average speed = \\frac{\\text{Total distance}}{\\text{Time of flight}} = \\frac{2H}{T}.\n\nSince maximum height H = \\frac{u^2}{2g} and time of flight T = \\frac{2u}{g},\n\nAverage speed = \\frac{2 \\cdot \\frac{u^2}{2g}}{\\frac{2u}{g}} = \\frac{u}{2}.',
+      explanation: 'Average speed = $\\frac{\\text{Total distance}}{\\text{Time of flight}} = \\frac{2H}{T}$.\n\nSince maximum height $H = \\frac{u^2}{2g}$ and time of flight $T = \\frac{2u}{g}$,\n\nAverage speed = $\\frac{2 \\cdot \\frac{u^2}{2g}}{\\frac{2u}{g}} = \\frac{u}{2}$.',
       videoSolutionUrl: ''
     },
     {
@@ -73,10 +73,10 @@ export const DEFAULT_DAILY_QUESTIONS: Record<SubjectKey, DailyQuestion[]> = {
       subject: 'physics',
       topic: 'Kinematics & Projectile Motion',
       difficulty: 'MEDIUM',
-      questionText: 'A projectile is launched from ground level with speed u at angle θ to the horizontal. If horizontal range R = 4H (where H is max height), then the angle of projection θ is:',
+      questionText: 'A projectile is launched from ground level with speed $u$ at angle $\\theta$ to the horizontal. If horizontal range $R = 4H$ (where $H$ is max height), then the angle of projection $\\theta$ is:',
       options: ['30°', '45°', '60°', '75°'],
       correctIndex: 1,
-      explanation: 'Using the identity R = 4H \\cot \\theta. Given R = 4H, we get 4H = 4H \\cot \\theta \\implies \\cot \\theta = 1 \\implies \\theta = 45^\\circ.',
+      explanation: 'Using the identity $R = 4H \\cot \\theta$. Given $R = 4H$, we get $4H = 4H \\cot \\theta \\implies \\cot \\theta = 1 \\implies \\theta = 45^\\circ$.',
       videoSolutionUrl: ''
     },
     {
@@ -84,10 +84,10 @@ export const DEFAULT_DAILY_QUESTIONS: Record<SubjectKey, DailyQuestion[]> = {
       subject: 'physics',
       topic: 'Work, Energy & Power',
       difficulty: 'EASY',
-      questionText: 'A force \\vec{F} = (3\\hat{i} + 4\\hat{j})\\text{ N} displaces a particle by \\vec{d} = (2\\hat{i} + 5\\hat{j})\\text{ m}. The work done by the force is:',
+      questionText: 'A force $\\vec{F} = (3\\hat{i} + 4\\hat{j})\\text{ N}$ displaces a particle by $\\vec{d} = (2\\hat{i} + 5\\hat{j})\\text{ m}$. The work done by the force is:',
       options: ['14 J', '26 J', '18 J', '30 J'],
       correctIndex: 1,
-      explanation: 'Work W = \\vec{F} \\cdot \\vec{d} = (3 \\times 2) + (4 \\times 5) = 6 + 20 = 26\\text{ Joules}.',
+      explanation: 'Work $W = \\vec{F} \\cdot \\vec{d} = (3 \\times 2) + (4 \\times 5) = 6 + 20 = 26\\text{ Joules}$.',
       videoSolutionUrl: ''
     }
   ],

@@ -172,7 +172,7 @@ export const BoneAIFAB: React.FC<BoneAIFABProps> = ({ onClick, isOpen }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const hasBottomNav = isMobile && ['home', 'videos', 'tools'].includes(currentRoute);
+  const hasBottomNav = isMobile && ['home', 'videos', 'posts', 'tools'].includes(currentRoute);
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);

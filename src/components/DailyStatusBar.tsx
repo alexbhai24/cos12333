@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Atom, FlaskConical, Dna, Calculator, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { SubjectKey } from '../types/dailyStatus';
 import { useDailyStatus } from '../hooks/useDailyStatus';
 import { DailyStoryModal } from './DailyStoryModal';
@@ -14,6 +14,15 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
 
   const [activeSubject, setActiveSubject] = useState<SubjectKey | null>(null);
 
+  // Helper to rotate subject symbols on alternate days
+  const getSymbolForDay = (symbols: string[]) => {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 0);
+    const diff = now.getTime() - startOfYear.getTime();
+    const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+    return symbols[dayOfYear % symbols.length];
+  };
+
   const statusItems: {
     key: SubjectKey;
     label: string;
@@ -25,7 +34,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
     {
       key: 'nta_q',
       label: 'NTA_Q',
-      icon: <Target className="w-6 h-6 text-amber-400" />,
+      icon: <span className="text-2xl sm:text-3xl select-none filter drop-shadow">{getSymbolForDay(['💉', '🩺', '🩹'])}</span>,
       ringColor: 'from-amber-500 via-yellow-400 to-orange-500',
       bgColor: 'bg-amber-500/10 border-amber-500/30',
       textColor: 'text-amber-400'
@@ -33,7 +42,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
     {
       key: 'physics',
       label: 'Physics',
-      icon: <Atom className="w-6 h-6 text-rose-400" />,
+      icon: <span className="text-2xl sm:text-3xl select-none filter drop-shadow">{getSymbolForDay(['🧲', '🔭'])}</span>,
       ringColor: 'from-rose-500 via-pink-400 to-red-500',
       bgColor: 'bg-rose-500/10 border-rose-500/30',
       textColor: 'text-rose-400'
@@ -41,7 +50,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
     {
       key: 'chemistry',
       label: 'Chemistry',
-      icon: <FlaskConical className="w-6 h-6 text-cyan-400" />,
+      icon: <span className="text-2xl sm:text-3xl select-none filter drop-shadow">{getSymbolForDay(['🧪', '⚗️', '💊'])}</span>,
       ringColor: 'from-cyan-400 via-blue-400 to-indigo-500',
       bgColor: 'bg-cyan-500/10 border-cyan-500/30',
       textColor: 'text-cyan-400'
@@ -49,7 +58,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
     {
       key: 'biology',
       label: 'Biology',
-      icon: <Dna className="w-6 h-6 text-emerald-400" />,
+      icon: <span className="text-2xl sm:text-3xl select-none filter drop-shadow">{getSymbolForDay(['🧫', '🧬', '🫀'])}</span>,
       ringColor: 'from-emerald-400 via-teal-400 to-green-500',
       bgColor: 'bg-emerald-500/10 border-emerald-500/30',
       textColor: 'text-emerald-400'
@@ -57,7 +66,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
     {
       key: 'mathematics',
       label: 'Mathematics',
-      icon: <Calculator className="w-6 h-6 text-purple-400" />,
+      icon: <span className="text-2xl sm:text-3xl select-none filter drop-shadow">{getSymbolForDay(['🧮', '📐', '📏', '➕'])}</span>,
       ringColor: 'from-purple-400 via-violet-400 to-indigo-500',
       bgColor: 'bg-purple-500/10 border-purple-500/30',
       textColor: 'text-purple-400'

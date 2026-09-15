@@ -45,12 +45,20 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
     onAnswer(subject, currentQ.id, idx);
   };
 
+  const getSymbolForDay = (symbols: string[]) => {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 0);
+    const diff = now.getTime() - startOfYear.getTime();
+    const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+    return symbols[dayOfYear % symbols.length];
+  };
+
   const subjectTitles: Record<SubjectKey, { title: string; color: string; icon: string }> = {
-    nta_q: { title: 'NTA_Q (NTA Questions)', color: 'text-amber-400', icon: '🎯' },
-    physics: { title: 'Physics', color: 'text-rose-400', icon: '⚛️' },
-    chemistry: { title: 'Chemistry', color: 'text-cyan-400', icon: '🧪' },
-    biology: { title: 'Biology', color: 'text-emerald-400', icon: '🧫' },
-    mathematics: { title: 'Mathematics', color: 'text-purple-400', icon: '🧮' }
+    nta_q: { title: 'NTA_Q (NTA Questions)', color: 'text-amber-400', icon: getSymbolForDay(['💉', '🩺', '🩹']) },
+    physics: { title: 'Physics', color: 'text-rose-400', icon: getSymbolForDay(['🧲', '🔭']) },
+    chemistry: { title: 'Chemistry', color: 'text-cyan-400', icon: getSymbolForDay(['🧪', '⚗️', '💊']) },
+    biology: { title: 'Biology', color: 'text-emerald-400', icon: getSymbolForDay(['🧫', '🧬', '🫀']) },
+    mathematics: { title: 'Mathematics', color: 'text-purple-400', icon: getSymbolForDay(['🧮', '📐', '📏', '➕']) }
   };
 
   const currentSubInfo = subjectTitles[subject] || { title: subject, color: 'text-cyan-400', icon: '⚡' };
@@ -58,59 +66,62 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300 overflow-y-auto">
       {/* Container Phone / Story Layout */}
-      <div className="relative w-full max-w-lg bg-[#0e121e] border border-white/10 rounded-3xl sm:rounded-[32px] p-4 sm:p-6 shadow-2xl space-y-4 my-auto overflow-hidden">
+      <div className="relative w-full max-w-lg bg-[#0e121e] border border-white/10 rounded-3xl sm:rounded-[32px] p-4 sm:p-6 shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[88vh] my-auto overflow-hidden">
         
-        {/* Top Story Segmented Progress Bar */}
-        <div className="flex items-center gap-1.5 w-full">
-          {questions.map((q, idx) => {
-            const answered = userAnswers[q.id] !== undefined;
-            return (
-              <div
-                key={q.id}
-                onClick={() => setCurrentIndex(idx)}
-                className="h-1.5 flex-1 rounded-full cursor-pointer transition-all duration-300 overflow-hidden bg-white/15"
-              >
+        {/* Top Header Area (Fixed) */}
+        <div className="shrink-0 space-y-3 pb-2 border-b border-white/5">
+          {/* Top Story Segmented Progress Bar */}
+          <div className="flex items-center gap-1.5 w-full">
+            {questions.map((q, idx) => {
+              const answered = userAnswers[q.id] !== undefined;
+              return (
                 <div
-                  className={`h-full transition-all duration-300 ${
-                    idx === currentIndex
-                      ? 'bg-cyan-400'
-                      : answered
-                      ? 'bg-emerald-400'
-                      : 'bg-transparent'
-                  }`}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Header Row */}
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-lg">
-              {currentSubInfo.icon}
-            </div>
-            <div>
-              <h3 className={`text-base font-extrabold ${currentSubInfo.color} font-heading leading-none flex items-center gap-1.5`}>
-                <span>{currentSubInfo.title}</span>
-              </h3>
-              <p className="text-[11px] text-gray-400 mt-0.5 font-medium">
-                Question {currentIndex + 1} of {questions.length}
-              </p>
-            </div>
+                  key={q.id}
+                  onClick={() => setCurrentIndex(idx)}
+                  className="h-1.5 flex-1 rounded-full cursor-pointer transition-all duration-300 overflow-hidden bg-white/15"
+                >
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      idx === currentIndex
+                        ? 'bg-cyan-400'
+                        : answered
+                        ? 'bg-emerald-400'
+                        : 'bg-transparent'
+                    }`}
+                  />
+                </div>
+              );
+            })}
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-all active:scale-95"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Header Row */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-lg">
+                {currentSubInfo.icon}
+              </div>
+              <div>
+                <h3 className={`text-base font-extrabold ${currentSubInfo.color} font-heading leading-none flex items-center gap-1.5`}>
+                  <span>{currentSubInfo.title}</span>
+                </h3>
+                <p className="text-[11px] text-gray-400 mt-0.5 font-medium">
+                  Question {currentIndex + 1} of {questions.length}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-all active:scale-95"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Question Text */}
+        {/* Question Text & Options & Solution Scroll Area (Scrolls smoothly inside card) */}
         {currentQ ? (
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar space-y-4 py-3 min-h-0">
             <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-semibold text-white leading-relaxed">
               <MathFormattedText text={currentQ.questionText} />
 
@@ -230,7 +241,7 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
                     <h4 className="font-extrabold text-white uppercase text-[10px] tracking-wider text-cyan-400">
                       Explanation:
                     </h4>
-                    <div className="p-3 bg-black/30 rounded-xl border border-white/5 leading-relaxed font-mono text-xs whitespace-pre-line">
+                    <div className="p-3 bg-black/40 rounded-xl border border-white/5 leading-relaxed text-xs overflow-x-auto max-w-full">
                       <MathFormattedText text={currentQ.explanation} block />
                     </div>
                   </div>
@@ -263,8 +274,8 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
           </div>
         )}
 
-        {/* Footer Navigation Controls */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/10">
+        {/* Footer Navigation Controls (Fixed) */}
+        <div className="flex items-center justify-between pt-3 border-t border-white/10 shrink-0 mt-auto">
           <button
             disabled={currentIndex === 0}
             onClick={() => setCurrentIndex(p => Math.max(0, p - 1))}

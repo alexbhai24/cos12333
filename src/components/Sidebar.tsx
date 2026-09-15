@@ -16,6 +16,7 @@ import {
   Timer,
   Wrench,
   Layers,
+  Bookmark,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +40,7 @@ export const Sidebar: React.FC = () => {
     mobileDrawerOpen,
     setMobileDrawerOpen,
     user,
+    setIsSavedItemsOpen,
   } = useApp();
   const { userRole, currentUser } = useAuth();
 
@@ -161,11 +163,52 @@ export const Sidebar: React.FC = () => {
       )}
 
       <aside
-        className={`fixed top-16 bottom-0 left-0 bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] z-40 transition-all duration-300 flex flex-col ${mobileDrawerOpen
-            ? 'translate-x-0 w-16'
-            : '-translate-x-full lg:translate-x-0 ' + (sidebarCollapsed ? 'w-16' : 'w-60')
-          }`}
+        className={`fixed bottom-0 left-0 bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] z-40 transition-all duration-300 flex flex-col ${
+          mobileDrawerOpen
+            ? 'translate-x-0 w-16 top-16'
+            : '-translate-x-full lg:translate-x-0 top-16 lg:top-0 ' + (sidebarCollapsed ? 'w-16' : 'w-60')
+        }`}
       >
+        {/* Brand Logo & Title (Desktop View inside Sidebar) */}
+        <div
+          className={`hidden lg:flex items-center justify-between px-3.5 h-16 select-none group text-left shrink-0 ${
+            sidebarCollapsed ? 'justify-center px-0' : ''
+          }`}
+        >
+          <div
+            onClick={() => setCurrentRoute('home')}
+            className="flex items-center space-x-2.5 cursor-pointer"
+          >
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg border border-white/20 flex-shrink-0">
+              <img
+                src="/logo.png"
+                alt="CosmicBone Logo"
+                className="w-full h-full object-cover rounded-xl"
+              />
+            </div>
+            {!sidebarCollapsed && (
+              <div>
+                <span className="font-handwritten text-xl text-white tracking-wide block leading-none filter drop-shadow">
+                  Cosmic<span className="text-[var(--color-cyan)]">Bone</span>
+                </span>
+                <span className="text-[8px] font-bold text-[var(--text-muted)] tracking-wider block uppercase mt-0.5">
+                  NEXT-GEN EDTECH
+                </span>
+              </div>
+            )}
+          </div>
+
+          {!sidebarCollapsed && (
+            <button
+              onClick={() => setIsSavedItemsOpen(true)}
+              className="p-2 bg-[var(--bg-surface-secondary)]/80 border border-[var(--border-color)] hover:border-[var(--color-cyan)] rounded-xl text-gray-400 hover:text-[var(--color-cyan)] transition-all shadow-md active:scale-95 flex items-center justify-center flex-shrink-0 ml-1"
+              title="Open Learning Library (Saved Items) 🔖"
+            >
+              <Bookmark className="w-4 h-4 text-[var(--color-cyan)]" />
+            </button>
+          )}
+        </div>
+
         <div className="flex-1 overflow-y-auto scrollbar-none px-2 sm:px-3 py-4">
           {renderNavGroup('LEARN & COMMUNITY', learnItems)}
           {renderNavGroup('ADMIN', adminItems)}

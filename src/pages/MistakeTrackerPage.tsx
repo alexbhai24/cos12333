@@ -4,37 +4,37 @@ import { syllabusJEE } from '../data/syllabusJEE';
 import { SyllabusSubject } from '../types/syllabus';
 import { useApp } from '../context/AppContext';
 import {
-  detectDocumentCorners,
-  warpAndEnhanceDocument,
-  segmentPageLayout,
-  DetectedBlock
-} from '../utils/scannerVision';
-import {
   Search,
   Flame,
   Atom,
   BookOpen,
   Check,
   Plus,
-  Camera,
   Trash2,
   X,
   Download,
   Eye,
-  ScanLine,
   Upload,
   Image as ImageIcon,
   PenTool,
   RotateCcw,
   RotateCw,
   ChevronLeft,
+  ChevronRight,
   Zap,
-  MoreVertical,
-  QrCode
+  Mic,
+  MicOff,
+  Play,
+  Square,
+  Volume2,
+  CheckCircle2,
+  ListOrdered,
+  FileText,
+  Sparkles,
+  Radio
 } from 'lucide-react';
 
 type ExamType = 'neet' | 'jee';
-type AddMode = 'scan' | 'manual';
 
 export interface MistakeEntry {
   id: string;
@@ -51,6 +51,15 @@ export interface MistakeEntry {
   explanation: string;
   mySlip: string;
   imageUrl?: string;
+  audioUrl?: string;
+  hasOptions?: boolean;
+  options?: {
+    a: string;
+    b: string;
+    c: string;
+    d: string;
+  };
+  selectedOption?: 'A' | 'B' | 'C' | 'D';
   isMastered: boolean;
   date: string;
 }
@@ -67,8 +76,16 @@ const DEFAULT_MISTAKES: MistakeEntry[] = [
     sourceType: 'manual',
     sourceName: 'Practice Question',
     questionText: 'A projectile is thrown with velocity v at an angle theta. What is the radius of curvature of the trajectory at the highest point?',
+    hasOptions: true,
+    options: {
+      a: 'R = v^2 / g',
+      b: 'R = (v cos theta)^2 / g',
+      c: 'R = (v sin theta)^2 / g',
+      d: 'R = v^2 sin(2 theta) / g'
+    },
+    selectedOption: 'B',
     mySlip: 'I forgot that at the highest point velocity is purely horizontal (v cos theta) and acceleration is purely vertical (g).',
-    correctAnswer: 'R = (v cos theta)^2 / g',
+    correctAnswer: 'Option B: R = (v cos theta)^2 / g',
     explanation: 'At the apex, v_vertical = 0, so v_net = v*cos(theta). Normal acceleration is g. Radius of curvature R = v_perp^2 / a_normal = (v cos theta)^2 / g.',
     isMastered: false,
     date: '2026-09-10'
@@ -84,8 +101,16 @@ const DEFAULT_MISTAKES: MistakeEntry[] = [
     sourceType: 'photo',
     sourceName: 'Allen Mock Test 4',
     questionText: 'Identify the incorrect statement regarding Methanogens in Archaebacteria.',
+    hasOptions: true,
+    options: {
+      a: 'Methanogens produce biogas from dung.',
+      b: 'They are present in the gut of several ruminant animals.',
+      c: 'Their cell walls contain peptidoglycan same as eubacteria.',
+      d: 'They can survive in harsh marshy environments.'
+    },
+    selectedOption: 'C',
     mySlip: 'I misread "incorrect" and picked option A because methanogens produce biogas, but option C was false regarding cell wall peptidoglycan.',
-    correctAnswer: 'Option C: Archaebacteria lack true peptidoglycan (they have pseudomurein).',
+    correctAnswer: 'Option C',
     explanation: 'Archaebacteria cell wall is distinct with branched chain lipids in membrane and pseudomurein in wall, helping them survive extreme marshes and rumen of cattle.',
     isMastered: true,
     date: '2026-09-08'
@@ -101,8 +126,9 @@ const DEFAULT_MISTAKES: MistakeEntry[] = [
     sourceType: 'manual',
     sourceName: 'Daily Practice Problem (DPP)',
     questionText: 'Let R be a relation on integers where aRb if and only if a - b is divisible by 5. Check if R is an equivalence relation.',
+    hasOptions: false,
     mySlip: 'Forgot to verify transitivity for negative differences.',
-    correctAnswer: 'R is Reflexive, Symmetric, and Transitive (Equivalence Relation).',
+    correctAnswer: 'Equivalence Relation (Reflexive, Symmetric, Transitive)',
     explanation: 'Since a - a = 0 (divisible by 5), if 5 | (a - b) then 5 | (b - a). If 5 | (a - b) and 5 | (b - c), then 5 | (a - c). Hence all three hold.',
     isMastered: false,
     date: '2026-09-11'
@@ -160,32 +186,42 @@ export const MistakeTrackerPage: React.FC = () => {
     return activeSubject.name.replace(/\s*\(Theory:.*?\)/gi, '').replace(/\s*\(.*Marks\)/gi, '').trim();
   }, [activeSubject]);
 
-  // Modal State (3 Steps: 1 = Real Camera Scanner, 2 = Crop Screen, 3 = Syllabus Details)
+  // 3-Step Guided Modal Wizard State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [addStep, setAddStep] = useState<1 | 2 | 3>(1);
-  const [addMode, setAddMode] = useState<AddMode>('scan');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  // Camera & Stream State
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const activeStreamRef = useRef<MediaStream | null>(null);
-  const [hasCamera, setHasCamera] = useState(false);
-  const [flashlightOn, setFlashlightOn] = useState(false);
+  // Form Fields - Step 1: Question Type & Media Notes
+  const [questionFormat, setQuestionFormat] = useState<'mcq' | 'subjective'>('mcq');
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  
+  // Voice Recording state (MediaRecorder API)
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerIntervalRef = useRef<any>(null);
 
-  // Raw Captured / Uploaded Image vs Final Cropped Image
-  const [rawImage, setRawImage] = useState<string | null>(null);
-  const [croppedImage, setCroppedImage] = useState<string | null>(null);
-  const [cropBox, setCropBox] = useState({ x: 0.05, y: 0.08, w: 0.9, h: 0.82 });
-  const [rotation, setRotation] = useState(0);
-
-  // Form Fields
+  // Form Fields - Step 2: Syllabus & Details
   const [formSubjectId, setFormSubjectId] = useState('');
   const [formChapterId, setFormChapterId] = useState('');
   const [formTopicTitle, setFormTopicTitle] = useState('');
   const [formCustomTopic, setFormCustomTopic] = useState('');
-  const [formSourceName, setFormSourceName] = useState('Error Book Entry');
+  const [formSourceName, setFormSourceName] = useState('');
   const [formQuestionText, setFormQuestionText] = useState('');
-  const [formMySlip, setFormMySlip] = useState('');
+  
+  // MCQ Options
+  const [optionA, setOptionA] = useState('');
+  const [optionB, setOptionB] = useState('');
+  const [optionC, setOptionC] = useState('');
+  const [optionD, setOptionD] = useState('');
+  const [correctOption, setCorrectOption] = useState<'A' | 'B' | 'C' | 'D'>('A');
+
+  // Direct Subjective Answer
   const [formCorrectAnswer, setFormCorrectAnswer] = useState('');
+
+  // Form Fields - Step 3: Analysis & Explanation
+  const [formMySlip, setFormMySlip] = useState('');
   const [formExplanation, setFormExplanation] = useState('');
 
   // Lightbox View Full Image Modal
@@ -198,123 +234,56 @@ export const MistakeTrackerPage: React.FC = () => {
     setFlippedCards(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // File Inputs Ref
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper to strictly stop all camera & mic hardware tracks
-  const stopAllMediaTracks = () => {
-    if (activeStreamRef.current) {
-      activeStreamRef.current.getTracks().forEach(track => {
-        track.stop();
-        track.enabled = false;
-      });
-      activeStreamRef.current = null;
+  // Voice recording handlers
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(audioBlob);
+        setAudioBlobUrl(url);
+        // Stop audio tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      alert('Could not access microphone for voice recording. Please check permissions.');
     }
   };
 
-  // Live real-time document auto-detection state
-  const [detectedBox, setDetectedBox] = useState<{
-    isDetected: boolean;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    confidence: number;
-  }>({ isDetected: false, x: 0.05, y: 0.08, w: 0.9, h: 0.82, confidence: 0 });
-
-  // Real-time camera detection loop (runs while in Step 1 & Scan mode)
-  useEffect(() => {
-    if (!isAddModalOpen || addStep !== 1 || addMode !== 'scan') return;
-
-    let animFrameId: number;
-    const canvas = document.createElement('canvas');
-    canvas.width = 320;
-    canvas.height = 240;
-    const ctx = canvas.getContext('2d');
-
-    const sampleFrame = () => {
-      if (videoRef.current && videoRef.current.readyState === 4 && ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, 320, 240);
-        const corners = detectDocumentCorners(canvas, 0.05);
-
-        const w = (corners.bottomRight.x - corners.topLeft.x) / 320;
-        const h = (corners.bottomRight.y - corners.topLeft.y) / 240;
-        const x = corners.topLeft.x / 320;
-        const y = corners.topLeft.y / 240;
-
-        if (w > 0.25 && h > 0.25) {
-          setDetectedBox({
-            isDetected: true,
-            x: Math.max(0.02, x),
-            y: Math.max(0.02, y),
-            w: Math.min(0.96, w),
-            h: Math.min(0.96, h),
-            confidence: 0.92
-          });
-        } else {
-          setDetectedBox(prev => ({ ...prev, isDetected: false }));
-        }
-      }
-      animFrameId = requestAnimationFrame(sampleFrame);
-    };
-
-    const timer = setTimeout(() => {
-      sampleFrame();
-    }, 400);
-
-    return () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(animFrameId);
-    };
-  }, [isAddModalOpen, addStep, addMode]);
-
-  // Initialize camera stream when in Step 1 & Scan mode
-  useEffect(() => {
-    let isMounted = true;
-
-    async function startCamera() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } }
-        });
-        if (isMounted) {
-          activeStreamRef.current = stream;
-          setHasCamera(true);
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(() => {});
-          }
-        } else {
-          stream.getTracks().forEach(t => t.stop());
-        }
-      } catch (err) {
-        if (isMounted) setHasCamera(false);
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
       }
     }
+  };
 
-    if (isAddModalOpen && addStep === 1 && addMode === 'scan') {
-      startCamera();
-    } else {
-      stopAllMediaTracks();
-    }
-
-    return () => {
-      isMounted = false;
-      stopAllMediaTracks();
-    };
-  }, [isAddModalOpen, addStep, addMode]);
-
-  // Lock body scroll when modal or lightbox is open
-  useEffect(() => {
-    if (!isAddModalOpen && !lightboxImage) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow || '';
-    };
-  }, [isAddModalOpen, lightboxImage]);
+  const deleteRecording = () => {
+    setAudioBlobUrl(null);
+    setRecordingSeconds(0);
+  };
 
   // Synchronize form subject & chapters when modal opens
   useEffect(() => {
@@ -388,114 +357,55 @@ export const MistakeTrackerPage: React.FC = () => {
     }
   };
 
-  // Capture video frame & stop media stream immediately
-  const captureFrameToCrop = () => {
-    if (videoRef.current) {
-      const video = videoRef.current;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-        setRawImage(dataUrl);
-
-        stopAllMediaTracks(); // Turn off camera hardware immediately
-        setAddStep(2); // Proceed to Interactive Crop Screen
-      }
-    }
-  };
-
-  // Gallery File Upload
-  const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload handler
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-      setRawImage(reader.result as string);
-      stopAllMediaTracks();
-      setAddStep(2);
+      setUploadedImage(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
 
-  // Apply Crop to Canvas & Proceed to Step 3
-  const applyCropAndProceed = () => {
-    if (!rawImage) {
-      setAddStep(3);
-      return;
-    }
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        setCroppedImage(rawImage);
-        setAddStep(3);
-        return;
-      }
-
-      const cropX = img.width * cropBox.x;
-      const cropY = img.height * cropBox.y;
-      const cropW = Math.max(img.width * cropBox.w, 50);
-      const cropH = Math.max(img.height * cropBox.h, 50);
-
-      canvas.width = cropW;
-      canvas.height = cropH;
-
-      ctx.drawImage(
-        img,
-        cropX, cropY, cropW, cropH,
-        0, 0, cropW, cropH
-      );
-
-      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
-      setCroppedImage(croppedUrl);
-      setAddStep(3); // Proceed to Syllabus Details Step
-    };
-    img.onerror = () => {
-      setCroppedImage(rawImage);
-      setAddStep(3);
-    };
-    img.src = rawImage;
-  };
-
-  // Download image helper
-  const handleDownloadImage = (url: string, filename = 'error_book_image.png') => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Close modal & stop media streams cleanly
+  // Close modal reset
   const handleCloseModal = () => {
-    stopAllMediaTracks();
+    if (isRecording) stopRecording();
     setIsAddModalOpen(false);
-    setAddStep(1);
-    setRawImage(null);
-    setCroppedImage(null);
+    setStep(1);
+    setUploadedImage(null);
+    setAudioBlobUrl(null);
+    setFormQuestionText('');
+    setOptionA('');
+    setOptionB('');
+    setOptionC('');
+    setOptionD('');
+    setFormCorrectAnswer('');
+    setFormMySlip('');
+    setFormExplanation('');
   };
 
-  // Save new mistake entry to Error Book
+  // Save new mistake entry
   const handleSaveMistake = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const finalImg = croppedImage || rawImage;
-
-    if (!formQuestionText && !finalImg) {
-      alert('Please scan/upload an image or type your question statement.');
+    if (!formQuestionText && !uploadedImage && !audioBlobUrl) {
+      alert('Please add a question statement, upload a photo, or record a voice note.');
       return;
     }
 
     const currentSubj = validSubjects.find(s => s.id === formSubjectId) || validSubjects[0];
     const currentCh = (currentSubj?.chapters || []).find(c => c.id === formChapterId) || currentSubj?.chapters[0];
     const finalTopic = formTopicTitle === '__custom' ? formCustomTopic : formTopicTitle;
+
+    let finalCorrectAnswer = formCorrectAnswer;
+    if (questionFormat === 'mcq') {
+      const optVal =
+        correctOption === 'A' ? optionA :
+        correctOption === 'B' ? optionB :
+        correctOption === 'C' ? optionC : optionD;
+      finalCorrectAnswer = `Option ${correctOption}${optVal ? `: ${optVal}` : ''}`;
+    }
 
     const newEntry: MistakeEntry = {
       id: 'm_' + Date.now(),
@@ -505,24 +415,29 @@ export const MistakeTrackerPage: React.FC = () => {
       chapterId: currentCh?.id || 'ch1',
       chapterTitle: currentCh?.title || 'Chapter',
       topicTitle: finalTopic || 'General Topic',
-      sourceType: finalImg ? 'photo' : 'manual',
-      sourceName: formSourceName || (finalImg ? 'Scanner Crop' : 'Manual Question Entry'),
-      questionText: formQuestionText || 'Scanned question',
+      sourceType: audioBlobUrl ? 'voice' : uploadedImage ? 'photo' : 'manual',
+      sourceName: formSourceName || (questionFormat === 'mcq' ? 'MCQ Question' : 'Subjective Question'),
+      questionText: formQuestionText || (uploadedImage ? 'Photo attached question' : 'Voice note recorded question'),
+      hasOptions: questionFormat === 'mcq',
+      options: questionFormat === 'mcq' ? { a: optionA, b: optionB, c: optionC, d: optionD } : undefined,
+      selectedOption: questionFormat === 'mcq' ? correctOption : undefined,
       mySlip: formMySlip,
-      correctAnswer: formCorrectAnswer || 'Refer to explanation',
+      correctAnswer: finalCorrectAnswer || 'Refer to solution',
       explanation: formExplanation || 'Reviewed concept',
-      imageUrl: finalImg || undefined,
+      imageUrl: uploadedImage || undefined,
+      audioUrl: audioBlobUrl || undefined,
       isMastered: false,
       date: new Date().toISOString().split('T')[0]
     };
 
     setMistakes(prev => [newEntry, ...prev]);
-
     handleCloseModal();
-    setFormQuestionText('');
-    setFormMySlip('');
-    setFormCorrectAnswer('');
-    setFormExplanation('');
+  };
+
+  const formatTimer = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -571,14 +486,13 @@ export const MistakeTrackerPage: React.FC = () => {
 
           <button
             onClick={() => {
-              setAddStep(1);
-              setAddMode('scan');
+              setStep(1);
               setIsAddModalOpen(true);
             }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:opacity-90 text-black font-black text-sm shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:scale-105 active:scale-95 transition-all"
+            className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 hover:opacity-90 text-black font-black shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-110 active:scale-95 transition-all flex items-center justify-center shrink-0"
+            title="Add Error Question"
           >
-            <ScanLine className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Add Error Question</span>
+            <Plus className="w-5 h-5 stroke-[3]" />
           </button>
         </div>
       </div>
@@ -638,14 +552,13 @@ export const MistakeTrackerPage: React.FC = () => {
 
               <button
                 onClick={() => {
-                  setAddStep(1);
-                  setAddMode('scan');
+                  setStep(1);
                   setIsAddModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-black bg-[var(--color-primary)] hover:opacity-90 shadow-md transition-all shrink-0"
+                className="w-8 h-8 rounded-full text-black bg-[var(--color-primary)] hover:opacity-90 shadow-md transition-all flex items-center justify-center shrink-0"
+                title="Add Error Question"
               >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span className="hidden sm:inline">Add Error</span>
+                <Plus className="w-4 h-4 stroke-[3]" />
               </button>
             </div>
 
@@ -678,21 +591,20 @@ export const MistakeTrackerPage: React.FC = () => {
           </div>
           <h3 className="text-lg font-bold text-white">No Errors Logged For {cleanSubjectName}</h3>
           <p className="text-xs text-white/50 max-w-sm mx-auto">
-            Scan your test paper with Document Scanner or type your question statement manually to add it to Error Book.
+            Log your mistakes with MCQ options, audio voice notes, or photo solutions to turn weak topics into high scores.
           </p>
           <button
             onClick={() => {
-              setAddStep(1);
-              setAddMode('scan');
+              setStep(1);
               setIsAddModalOpen(true);
             }}
             className="px-5 py-2 rounded-full bg-[var(--color-primary)] text-black text-xs font-bold shadow-lg"
           >
-            + Add First Error Question
+            Add First Error Question
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {subjectMistakes.map(entry => {
             const isFlipped = !!flippedCards[entry.id];
 
@@ -700,51 +612,65 @@ export const MistakeTrackerPage: React.FC = () => {
               <div
                 key={entry.id}
                 onClick={() => toggleFlip(entry.id)}
-                className={`relative min-h-[280px] p-5 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group shadow-lg ${
+                className={`relative min-h-[300px] p-5 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group shadow-lg ${
                   entry.isMastered
                     ? 'bg-emerald-950/20 border-emerald-500/30'
-                    : 'bg-[var(--bg-surface-solid)]/60 border-white/10 hover:border-[var(--color-cyan)]/50'
+                    : 'bg-[var(--bg-surface-solid)]/60 border-white/10 hover:border-[var(--color-primary)]/50'
                 }`}
               >
                 {/* Top Badge & Action Row */}
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/40 text-[var(--color-primary)] truncate max-w-[150px]">
+                  <div className="flex flex-col gap-2 mb-3">
+                    <div className="flex items-center justify-between gap-1.5 min-w-0">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/40 text-[var(--color-primary)] truncate max-w-[130px]" title={entry.chapterTitle}>
                         {entry.chapterTitle}
                       </span>
-                      {entry.sourceType === 'photo' && (
-                        <span className="p-1 rounded-lg bg-cyan-500/20 text-cyan-400" title="Photo Attached">
-                          <Camera className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                      {entry.sourceType === 'manual' && (
-                        <span className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400" title="Manual Text Entry">
-                          <PenTool className="w-3.5 h-3.5" />
-                        </span>
-                      )}
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => toggleMastered(entry.id, e)}
+                          className={`p-1.5 rounded-xl border transition-all ${
+                            entry.isMastered
+                              ? 'bg-emerald-500 text-black border-emerald-400'
+                              : 'bg-white/5 border-white/10 text-white/50 hover:text-emerald-400 hover:border-emerald-400/40'
+                          }`}
+                          title={entry.isMastered ? 'Mastered!' : 'Mark as Mastered'}
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </button>
+
+                        <button
+                          onClick={(e) => handleDeleteMistake(entry.id, e)}
+                          className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Delete card"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => toggleMastered(entry.id, e)}
-                        className={`p-1.5 rounded-xl border transition-all ${
-                          entry.isMastered
-                            ? 'bg-emerald-500 text-black border-emerald-400'
-                            : 'bg-white/5 border-white/10 text-white/50 hover:text-emerald-400 hover:border-emerald-400/40'
-                        }`}
-                        title={entry.isMastered ? 'Mastered!' : 'Mark as Mastered'}
-                      >
-                        <Check className="w-4 h-4 stroke-[3]" />
-                      </button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {entry.hasOptions ? (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                          MCQ
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          SUBJECTIVE
+                        </span>
+                      )}
 
-                      <button
-                        onClick={(e) => handleDeleteMistake(entry.id, e)}
-                        className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title="Delete card"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {entry.audioUrl && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold flex items-center gap-1" title="Audio Note Attached">
+                          <Mic className="w-3 h-3" /> Voice
+                        </span>
+                      )}
+
+                      {entry.imageUrl && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[9px] font-bold flex items-center gap-1" title="Photo Attached">
+                          <ImageIcon className="w-3 h-3" /> Photo
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -754,17 +680,16 @@ export const MistakeTrackerPage: React.FC = () => {
 
                   {/* FLIP CARD CONTENT */}
                   {!isFlipped ? (
-                    /* FRONT SIDE: Image Preview (Natural Aspect Ratio) & Question Text */
+                    /* FRONT SIDE */
                     <div className="space-y-3">
-                      {/* Dynamically Sized Image Container (No Black Padding Gaps!) */}
+                      {/* Image Preview */}
                       {entry.imageUrl && (
-                        <div className="relative w-full rounded-2xl overflow-hidden border border-white/15 bg-[#0e111d] max-h-56 flex items-center justify-center">
+                        <div className="relative w-full rounded-2xl overflow-hidden border border-white/15 bg-[#0e111d] max-h-48 flex items-center justify-center">
                           <img
                             src={entry.imageUrl}
                             alt="Question Photo"
-                            className="w-full max-h-56 object-contain rounded-2xl"
+                            className="w-full max-h-48 object-contain rounded-2xl"
                           />
-                          {/* Top-Right Overlay Buttons: View Full & Download ONLY */}
                           <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/85 backdrop-blur-md px-2 py-1 rounded-xl border border-white/20 z-10 shadow-lg">
                             <button
                               onClick={(e) => {
@@ -772,18 +697,22 @@ export const MistakeTrackerPage: React.FC = () => {
                                 setLightboxImage(entry.imageUrl || null);
                               }}
                               className="p-1 text-white/80 hover:text-cyan-400 transition-colors"
-                              title="See Full / View Image"
+                              title="View Image"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (entry.imageUrl) handleDownloadImage(entry.imageUrl);
+                                if (entry.imageUrl) {
+                                  const link = document.createElement('a');
+                                  link.href = entry.imageUrl;
+                                  link.download = 'error_book_image.png';
+                                  link.click();
+                                }
                               }}
                               className="p-1 text-white/80 hover:text-emerald-400 transition-colors"
-                              title="Download Image"
+                              title="Download"
                             >
                               <Download className="w-4 h-4" />
                             </button>
@@ -791,9 +720,49 @@ export const MistakeTrackerPage: React.FC = () => {
                         </div>
                       )}
 
-                      <p className="text-xs sm:text-sm font-semibold text-white leading-relaxed line-clamp-5">
+                      {/* Question Text */}
+                      <p className="text-xs sm:text-sm font-semibold text-white leading-relaxed line-clamp-4">
                         {entry.questionText}
                       </p>
+
+                      {/* MCQ Options Display */}
+                      {entry.hasOptions && entry.options && (
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          {(['a', 'b', 'c', 'd'] as const).map(optKey => {
+                            const val = entry.options?.[optKey];
+                            if (!val) return null;
+                            const isCorrect = entry.selectedOption === optKey.toUpperCase();
+                            return (
+                              <div
+                                key={optKey}
+                                className={`px-2.5 py-1.5 rounded-xl border text-[11px] flex items-center gap-2 truncate ${
+                                  isCorrect
+                                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-bold'
+                                    : 'bg-black/30 border-white/10 text-white/70'
+                                }`}
+                              >
+                                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${isCorrect ? 'bg-emerald-500 text-black font-extrabold' : 'bg-white/10 text-white'}`}>
+                                  {optKey.toUpperCase()}
+                                </span>
+                                <span className="truncate">{val}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Audio Voice Player Note */}
+                      {entry.audioUrl && (
+                        <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center gap-2">
+                          <Volume2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <audio
+                            src={entry.audioUrl}
+                            controls
+                            className="w-full h-7 text-xs rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      )}
 
                       {entry.mySlip && (
                         <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-xs text-rose-200 leading-snug">
@@ -811,16 +780,28 @@ export const MistakeTrackerPage: React.FC = () => {
                       </div>
 
                       <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white/90 leading-relaxed">
-                        <span className="font-bold text-[var(--color-cyan)] text-[10px] block uppercase">Explanation:</span>
+                        <span className="font-bold text-[var(--color-primary)] text-[10px] block uppercase">Explanation:</span>
                         {entry.explanation}
                       </div>
+
+                      {entry.audioUrl && (
+                        <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 space-y-1">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase block">Recorded Voice Note Solution:</span>
+                          <audio
+                            src={entry.audioUrl}
+                            controls
+                            className="w-full h-7 text-xs rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* Footer */}
                 <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-white/40">
-                  <span>{entry.sourceName || 'Error Book Card'}</span>
+                  <span>{entry.sourceName || 'Error Book Entry'}</span>
                   <span className="text-[var(--color-primary)] font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                     {isFlipped ? 'Show Question ↺' : 'Flip for Solution ↻'}
                   </span>
@@ -831,10 +812,10 @@ export const MistakeTrackerPage: React.FC = () => {
         </div>
       )}
 
-      {/* ERROR LOGGING MODAL: DOCUMENT SCANNER vs MANUAL PARAGRAPH ENTRY */}
+      {/* 3-STEP GUIDED ERROR ADDITION MODAL WIZARD */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="bg-[#0b0e1b] border border-white/20 rounded-3xl p-6 sm:p-8 max-w-2xl w-full my-6 space-y-5 shadow-2xl relative overflow-hidden">
+        <div className="fixed inset-0 top-16 z-[99999] flex items-start justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="bg-[#0b0e1b] border border-white/20 rounded-3xl p-5 sm:p-8 max-w-xl w-full my-4 mb-20 space-y-5 shadow-2xl relative overflow-hidden">
             
             <button
               onClick={handleCloseModal}
@@ -846,306 +827,182 @@ export const MistakeTrackerPage: React.FC = () => {
             {/* Modal Header */}
             <div className="relative z-10">
               <h2 className="text-xl font-bold text-white font-heading flex items-center gap-2">
-                <ScanLine className="w-6 h-6 text-cyan-400" />
+                <Sparkles className="w-6 h-6 text-emerald-400" />
                 <span>Add Question to Error Book</span>
               </h2>
               <p className="text-xs text-white/60 mt-0.5">
-                Scan via camera scanner or type/paste your question statement manually.
+                Guided 3-Step Wizard: Record audio notes, choose question format & map to syllabus.
               </p>
             </div>
 
-            {/* STEP 1: MODE SELECTOR (PHOTO SCAN vs MANUAL QUESTION TEXT) */}
-            {addStep === 1 && (
-              <div className="space-y-5 relative z-10 animate-in fade-in duration-200">
-                {/* 2 Clean Modes: Photo Scanner vs Manual Question Paragraph */}
-                <div className="grid grid-cols-2 gap-2 p-1 bg-black/50 border border-white/10 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => setAddMode('scan')}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      addMode === 'scan'
-                        ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-black shadow-md'
-                        : 'text-white/60 hover:text-white'
-                    }`}
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Camera Scanner</span>
-                  </button>
+            {/* Step Indicators */}
+            <div className="grid grid-cols-3 gap-2 p-1 bg-black/40 border border-white/10 rounded-2xl relative z-10">
+              <div className={`py-2 text-center rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                step === 1 ? 'bg-[var(--color-primary)] text-black shadow' : step > 1 ? 'text-emerald-400' : 'text-white/40'
+              }`}>
+                <span>1. Format & Media</span>
+              </div>
+              <div className={`py-2 text-center rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                step === 2 ? 'bg-[var(--color-primary)] text-black shadow' : step > 2 ? 'text-emerald-400' : 'text-white/40'
+              }`}>
+                <span>2. Syllabus & Options</span>
+              </div>
+              <div className={`py-2 text-center rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                step === 3 ? 'bg-[var(--color-primary)] text-black shadow' : 'text-white/40'
+              }`}>
+                <span>3. Slip & Solution</span>
+              </div>
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setAddMode('manual')}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      addMode === 'manual'
-                        ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-black shadow-md'
-                        : 'text-white/60 hover:text-white'
-                    }`}
-                  >
-                    <PenTool className="w-4 h-4" />
-                    <span>Manual Question Entry</span>
-                  </button>
+            {/* STEP 1: QUESTION FORMAT & AUDIO/PHOTO NOTES */}
+            {step === 1 && (
+              <div className="space-y-5 relative z-10 animate-in fade-in duration-200">
+                {/* Format Toggle */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white/80 block">Select Question Format *</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setQuestionFormat('mcq')}
+                      className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
+                        questionFormat === 'mcq'
+                          ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-md'
+                          : 'bg-black/40 border-white/10 text-white/60 hover:border-white/20'
+                      }`}
+                    >
+                      <ListOrdered className={`w-5 h-5 shrink-0 mt-0.5 ${questionFormat === 'mcq' ? 'text-emerald-400' : 'text-white/40'}`} />
+                      <div>
+                        <div className="text-xs font-black">With Options (MCQ)</div>
+                        <div className="text-[10px] text-white/50">Question statement + Options A, B, C, D</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setQuestionFormat('subjective')}
+                      className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
+                        questionFormat === 'subjective'
+                          ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-md'
+                          : 'bg-black/40 border-white/10 text-white/60 hover:border-white/20'
+                      }`}
+                    >
+                      <FileText className={`w-5 h-5 shrink-0 mt-0.5 ${questionFormat === 'subjective' ? 'text-emerald-400' : 'text-white/40'}`} />
+                      <div>
+                        <div className="text-xs font-black">Without Options</div>
+                        <div className="text-[10px] text-white/50">Subjective or direct numerical answer</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
-                {/* MODE 1: LIVE CAMERA SCANNER BOX (NO FAKE STATIC BOX!) */}
-                {addMode === 'scan' && (
-                  <div className="space-y-4">
-                    <div className="relative w-full h-64 rounded-2xl bg-black border border-white/15 overflow-hidden flex items-center justify-center">
-                      
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
+                {/* Audio Recording Section */}
+                <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white/90 flex items-center gap-1.5">
+                      <Mic className="w-4 h-4 text-emerald-400" />
+                      <span>Record Voice Note Explanation (Optional)</span>
+                    </span>
+                    {audioBlobUrl && (
+                      <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                        Audio Recorded
+                      </span>
+                    )}
+                  </div>
 
-                      {!hasCamera && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#18181b] text-white/60 space-y-2">
-                          <Camera className="w-10 h-10 text-amber-400 animate-pulse" />
-                          <p className="text-xs font-semibold text-white">Align question inside frame</p>
-                          <p className="text-[11px] text-white/40">Real camera detector active</p>
-                        </div>
-                      )}
-
-                      {/* Real-Time Auto-Detected Bounding Box & Quad Corners */}
-                      {detectedBox.isDetected ? (
-                        <div
-                          className="absolute border-2 border-amber-400 bg-amber-400/15 rounded-xl pointer-events-none z-30 transition-all duration-200 shadow-[0_0_30px_rgba(251,191,36,0.6)]"
-                          style={{
-                            top: `${detectedBox.y * 100}%`,
-                            left: `${detectedBox.x * 100}%`,
-                            width: `${detectedBox.w * 100}%`,
-                            height: `${detectedBox.h * 100}%`
-                          }}
+                  {!audioBlobUrl ? (
+                    <div className="flex items-center gap-3">
+                      {!isRecording ? (
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          className="flex-1 py-3 px-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs hover:bg-emerald-500/30 transition-all flex items-center justify-center gap-2"
                         >
-                          <div className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
-                          <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
-                          <div className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
-                          <div className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
-                          <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent animate-bounce top-1/2" />
-                        </div>
+                          <Mic className="w-4 h-4 text-emerald-400" />
+                          <span>Start Voice Recording</span>
+                        </button>
                       ) : (
-                        <div className="absolute inset-8 pointer-events-none z-20">
-                          <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-amber-400/60 rounded-tl-lg" />
-                          <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-amber-400/60 rounded-tr-lg" />
-                          <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-amber-400/60 rounded-br-lg" />
-                          <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-amber-400/60 rounded-bl-lg" />
+                        <div className="flex-1 flex items-center gap-3 p-2 rounded-xl bg-rose-950/40 border border-rose-500/40">
+                          <div className="w-3 h-3 rounded-full bg-rose-500 animate-ping ml-2" />
+                          <span className="text-xs font-mono font-bold text-rose-200">
+                            Recording: {formatTimer(recordingSeconds)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={stopRecording}
+                            className="ml-auto px-3 py-1.5 rounded-lg bg-rose-500 text-black font-bold text-xs flex items-center gap-1 hover:bg-rose-400"
+                          >
+                            <Square className="w-3.5 h-3.5 fill-current" />
+                            <span>Stop</span>
+                          </button>
                         </div>
                       )}
                     </div>
-
-                    <input
-                      ref={galleryInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleGalleryFileChange}
-                    />
-
-                    <div className="grid grid-cols-2 gap-3">
+                  ) : (
+                    <div className="flex items-center gap-3 p-2 bg-emerald-950/30 border border-emerald-500/30 rounded-xl">
+                      <audio controls src={audioBlobUrl} className="w-full h-8" />
                       <button
                         type="button"
-                        onClick={captureFrameToCrop}
-                        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold text-xs hover:bg-cyan-500/30 transition-all"
+                        onClick={deleteRecording}
+                        className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                        title="Delete recording"
                       >
-                        <Camera className="w-4 h-4" />
-                        <span>Snap Photo</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => galleryInputRef.current?.click()}
-                        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 font-bold text-xs hover:bg-purple-500/30 transition-all"
-                      >
-                        <Upload className="w-4 h-4" />
-                        <span>Upload from gallery</span>
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* MODE 2: MANUAL QUESTION PARAGRAPH ENTRY */}
-                {addMode === 'manual' && (
-                  <div className="space-y-3">
-                    <label className="text-xs font-semibold text-white/80 block">
-                      Type or Paste Question Statement / Paragraph *
-                    </label>
-                    <textarea
-                      rows={5}
-                      value={formQuestionText}
-                      onChange={(e) => setFormQuestionText(e.target.value)}
-                      placeholder="Type or paste full error question text, formula, or textbook paragraph here..."
-                      className="w-full px-4 py-3 bg-black/50 border border-white/15 rounded-2xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-emerald-400 resize-none leading-relaxed"
-                    />
-                  </div>
-                )}
+                {/* Upload Question Photo (Optional) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white/80 block">Attach Photo / Screenshot (Optional)</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
 
-                {/* Advance to Step 2 */}
+                  {uploadedImage ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-white/20 max-h-44 bg-black flex items-center justify-center">
+                      <img src={uploadedImage} alt="Uploaded" className="max-h-44 object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => setUploadedImage(null)}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/80 text-rose-400 hover:bg-rose-500 hover:text-white transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-5 rounded-2xl border-2 border-dashed border-white/20 hover:border-emerald-400/50 bg-black/30 hover:bg-black/50 text-white/60 hover:text-white transition-all flex flex-col items-center justify-center gap-2"
+                    >
+                      <Upload className="w-6 h-6 text-emerald-400" />
+                      <span className="text-xs font-bold">Click to Upload Question Image or Diagram</span>
+                      <span className="text-[10px] text-white/40">PNG, JPG, or WEBP supported</span>
+                    </button>
+                  )}
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setAddStep(2)}
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-black text-xs shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                  onClick={() => setStep(2)}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 text-black font-black text-xs shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2"
                 >
-                  <span>Step 2: Syllabus & Solution Details →</span>
+                  <span>Step 2: Syllabus & Question Details →</span>
                 </button>
               </div>
             )}
 
-            {/* STEP 2: INTERACTIVE CROP SCREEN (IF PHOTO) */}
-            {addStep === 2 && (
+            {/* STEP 2: SYLLABUS MAPPING & QUESTION DETAILS */}
+            {step === 2 && (
               <div className="space-y-4 relative z-10 animate-in fade-in duration-200">
-                {rawImage ? (
-                  <div className="space-y-3">
-                    <span className="text-xs font-bold text-white/80 block">Adjust Crop Boundary & Orientation</span>
-                    <div className="relative w-full max-h-60 rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-white/15 p-2">
-                      <img src={rawImage} alt="Captured" className="max-h-56 object-contain rounded-xl" />
-                      <div
-                        className="absolute border-2 border-amber-400 rounded-xl pointer-events-none"
-                        style={{
-                          top: `${cropBox.y * 100}%`,
-                          left: `${cropBox.x * 100}%`,
-                          width: `${cropBox.w * 100}%`,
-                          height: `${cropBox.h * 100}%`
-                        }}
-                      >
-                        <div className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
-                        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
-                        <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
-                        <div className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setAddStep(1)}
-                        className="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold"
-                      >
-                        Retake
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={applyCropAndProceed}
-                        className="px-6 py-2.5 rounded-xl bg-amber-400 text-black font-bold text-xs shadow-lg"
-                      >
-                        Save Crop & Continue →
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* If manual mode, proceed directly to details */
-                  <form onSubmit={handleSaveMistake} className="space-y-4">
-                    {/* SYLLABUS CASCADING SELECTORS */}
-                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
-                      <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider block">
-                        Syllabus Subject & Chapter ({selectedExam.toUpperCase()})
-                      </span>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-semibold text-white/70 block mb-1">Subject *</label>
-                          <select
-                            value={formSubjectId}
-                            onChange={(e) => {
-                              const newSubjId = e.target.value;
-                              setFormSubjectId(newSubjId);
-                              const subj = validSubjects.find(s => s.id === newSubjId);
-                              if (subj?.chapters && subj.chapters.length > 0) {
-                                setFormChapterId(subj.chapters[0].id);
-                                setFormTopicTitle(subj.chapters[0].topics?.[0]?.title || '');
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white"
-                          >
-                            {validSubjects.map(s => (
-                              <option key={s.id} value={s.id}>
-                                {s.name.replace(/\s*\(Theory:.*?\)/gi, '').trim()}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-white/70 block mb-1">Chapter *</label>
-                          <select
-                            value={formChapterId}
-                            onChange={(e) => {
-                              const chId = e.target.value;
-                              setFormChapterId(chId);
-                              const ch = formChapters.find(c => c.id === chId);
-                              if (ch?.topics && ch.topics.length > 0) {
-                                setFormTopicTitle(ch.topics[0].title);
-                              } else {
-                                setFormTopicTitle('');
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white"
-                          >
-                            {formChapters.map(ch => (
-                              <option key={ch.id} value={ch.id}>
-                                {ch.title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        placeholder="Where I Went Wrong (My Slip)"
-                        value={formMySlip}
-                        onChange={(e) => setFormMySlip(e.target.value)}
-                        className="w-full px-3 py-2 bg-rose-950/20 border border-rose-500/25 rounded-xl text-xs text-white placeholder-rose-200/30"
-                      />
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder="Correct Answer"
-                          value={formCorrectAnswer}
-                          onChange={(e) => setFormCorrectAnswer(e.target.value)}
-                          className="w-full px-3 py-2 bg-emerald-950/20 border border-emerald-500/25 rounded-xl text-xs text-white placeholder-emerald-200/30"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Explanation / Solution"
-                          value={formExplanation}
-                          onChange={(e) => setFormExplanation(e.target.value)}
-                          className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => setAddStep(1)}
-                        className="px-4 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white text-xs font-semibold"
-                      >
-                        ← Step 1
-                      </button>
-
-                      <button
-                        type="submit"
-                        className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-black text-xs shadow-lg"
-                      >
-                        Save to Error Book
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            )}
-
-            {/* STEP 3: FINAL SYLLABUS MAPPING & SAVE */}
-            {addStep === 3 && (
-              <form onSubmit={handleSaveMistake} className="space-y-4 relative z-10 animate-in fade-in duration-200">
-                {/* SYLLABUS CASCADING SELECTORS */}
+                {/* Cascading Syllabus Selection */}
                 <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
-                  <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider block">
+                  <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider block">
                     Syllabus Subject & Chapter ({selectedExam.toUpperCase()})
                   </span>
 
@@ -1163,7 +1020,7 @@ export const MistakeTrackerPage: React.FC = () => {
                             setFormTopicTitle(subj.chapters[0].topics?.[0]?.title || '');
                           }
                         }}
-                        className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                        className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-400"
                       >
                         {validSubjects.map(s => (
                           <option key={s.id} value={s.id}>
@@ -1187,7 +1044,7 @@ export const MistakeTrackerPage: React.FC = () => {
                             setFormTopicTitle('');
                           }
                         }}
-                        className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                        className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-400"
                       >
                         {formChapters.map(ch => (
                           <option key={ch.id} value={ch.id}>
@@ -1197,70 +1054,175 @@ export const MistakeTrackerPage: React.FC = () => {
                       </select>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Question Statement / Description</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Type question or summary of what was asked..."
-                      value={formQuestionText}
-                      onChange={(e) => setFormQuestionText(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
-                    />
+                    <label className="text-xs font-semibold text-white/70 block mb-1">Topic in Chapter *</label>
+                    <select
+                      value={formTopicTitle}
+                      onChange={(e) => setFormTopicTitle(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-400"
+                    >
+                      {formTopics.map((topic, i) => (
+                        <option key={i} value={topic.title}>
+                          {topic.title}
+                        </option>
+                      ))}
+                      <option value="__custom">+ Custom Topic / Specific Sub-Concept</option>
+                    </select>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold text-rose-300 block mb-1">Where I Went Wrong (My Slip)</label>
+                  {formTopicTitle === '__custom' && (
+                    <div>
+                      <label className="text-xs font-semibold text-emerald-400 block mb-1">Enter Custom Topic Name *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Projectile Motion on Inclined Plane"
+                        value={formCustomTopic}
+                        onChange={(e) => setFormCustomTopic(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#121629] border border-emerald-500/40 rounded-xl text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Question Statement Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white/80 block">Question Statement *</label>
+                  <textarea
+                    rows={3}
+                    value={formQuestionText}
+                    onChange={(e) => setFormQuestionText(e.target.value)}
+                    placeholder="Type or paste full question statement..."
+                    className="w-full px-3.5 py-2.5 bg-black/50 border border-white/15 rounded-2xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-emerald-400 resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* MCQ OPTIONS OR DIRECT ANSWER */}
+                {questionFormat === 'mcq' ? (
+                  <div className="space-y-3 p-4 rounded-2xl bg-black/30 border border-white/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white/90">Options A, B, C, D & Correct Option</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">Select radio for correct answer</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {[
+                        { key: 'A', state: optionA, setter: setOptionA },
+                        { key: 'B', state: optionB, setter: setOptionB },
+                        { key: 'C', state: optionC, setter: setOptionC },
+                        { key: 'D', state: optionD, setter: setOptionD },
+                      ].map(({ key, state, setter }) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCorrectOption(key as any)}
+                            className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center shrink-0 transition-all ${
+                              correctOption === key
+                                ? 'bg-emerald-500 text-black shadow-md'
+                                : 'bg-white/10 text-white/60 hover:bg-white/20'
+                            }`}
+                          >
+                            {key}
+                          </button>
+                          <input
+                            type="text"
+                            value={state}
+                            onChange={(e) => setter(e.target.value)}
+                            placeholder={`Option ${key} text...`}
+                            className={`flex-1 px-3 py-2 rounded-xl border text-xs text-white focus:outline-none ${
+                              correctOption === key
+                                ? 'bg-emerald-950/20 border-emerald-500/50'
+                                : 'bg-black/40 border-white/15'
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-emerald-400 block">Direct Correct Answer / Solution Value *</label>
                     <input
                       type="text"
-                      placeholder="e.g. Calculation error, misread options, or formula mix-up"
-                      value={formMySlip}
-                      onChange={(e) => setFormMySlip(e.target.value)}
-                      className="w-full px-3 py-2 bg-rose-950/20 border border-rose-500/25 rounded-xl text-xs text-white placeholder-rose-200/30 focus:outline-none focus:border-rose-400"
+                      value={formCorrectAnswer}
+                      onChange={(e) => setFormCorrectAnswer(e.target.value)}
+                      placeholder="e.g. 45 m/s or R = (v cos theta)^2 / g"
+                      className="w-full px-3.5 py-2.5 bg-emerald-950/20 border border-emerald-500/30 rounded-xl text-xs text-white placeholder-emerald-200/30 focus:outline-none focus:border-emerald-400"
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold text-emerald-300 block mb-1">Correct Answer</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Option B"
-                        value={formCorrectAnswer}
-                        onChange={(e) => setFormCorrectAnswer(e.target.value)}
-                        className="w-full px-3 py-2 bg-emerald-950/20 border border-emerald-500/25 rounded-xl text-xs text-white placeholder-emerald-200/30 focus:outline-none focus:border-emerald-400"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-cyan-300 block mb-1">Explanation / Solution</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Key formula or concept..."
-                        value={formExplanation}
-                        onChange={(e) => setFormExplanation(e.target.value)}
-                        className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 <div className="flex items-center justify-between pt-3 border-t border-white/10">
                   <button
                     type="button"
-                    onClick={() => setAddStep(1)}
+                    onClick={() => setStep(1)}
                     className="px-4 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white text-xs font-semibold"
                   >
                     ← Step 1
                   </button>
 
                   <button
-                    type="submit"
-                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-black text-xs shadow-lg hover:opacity-90 transition-all"
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-black font-black text-xs shadow-lg hover:opacity-90 transition-all"
                   >
-                    Save to Error Book
+                    Step 3: Slip Analysis & Save →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: SLIP ANALYSIS & FINAL SAVE */}
+            {step === 3 && (
+              <form onSubmit={handleSaveMistake} className="space-y-4 relative z-10 animate-in fade-in duration-200">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-bold text-rose-400 block mb-1">Where I Went Wrong (My Slip) *</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Calculation error, misread options, or formula mix-up..."
+                      value={formMySlip}
+                      onChange={(e) => setFormMySlip(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-rose-950/20 border border-rose-500/30 rounded-2xl text-xs text-white placeholder-rose-200/30 focus:outline-none focus:border-rose-400 leading-relaxed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-emerald-300 block mb-1">Explanation / Key Concept Solution</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Step by step solution breakdown or formula reference..."
+                      value={formExplanation}
+                      onChange={(e) => setFormExplanation(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-black/40 border border-white/15 rounded-2xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-emerald-400 leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                {/* Summary Box */}
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 text-xs space-y-1.5">
+                  <span className="text-[10px] font-black uppercase text-emerald-400 block">Entry Preview Summary:</span>
+                  <div className="flex items-center gap-3 text-[11px] text-white/70 flex-wrap">
+                    <span>Type: <strong className="text-white">{questionFormat.toUpperCase()}</strong></span>
+                    {audioBlobUrl && <span className="text-emerald-400">🎙️ Voice Note Attached</span>}
+                    {uploadedImage && <span className="text-cyan-400">🖼️ Image Attached</span>}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="px-4 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white text-xs font-semibold"
+                  >
+                    ← Step 2
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-black font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all"
+                  >
+                    Save to Mistake Notebook ✓
                   </button>
                 </div>
               </form>
@@ -1281,7 +1243,12 @@ export const MistakeTrackerPage: React.FC = () => {
           >
             <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
               <button
-                onClick={() => handleDownloadImage(lightboxImage)}
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = lightboxImage;
+                  link.download = 'error_book_image.png';
+                  link.click();
+                }}
                 className="flex items-center gap-1 text-xs font-bold text-white hover:text-emerald-400 transition-colors"
                 title="Download Image"
               >
