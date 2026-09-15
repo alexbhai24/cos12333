@@ -308,8 +308,12 @@ const AppContent: React.FC = () => {
       <AppleShopDrawer />
       <AdminConsoleModal />
 
-      {/* Bone AI Floating Assistant (Hidden inside specific tools like bone-ai, syllabus-tracker, etc.) */}
-      {isBoneAIEnabled && !SUB_TOOL_ROUTES.includes(currentRoute) && (
+      {/* Bone AI Floating Assistant (Hidden inside specific tools and whenever ANY popup/modal is open) */}
+      {isBoneAIEnabled && !SUB_TOOL_ROUTES.includes(currentRoute) && !(
+        activeVideoModal || activeDocModal || activeBookModal || activeTestModal ||
+        isProfileSettingsOpen || isAdminConsoleOpen || isSavedItemsOpen ||
+        isStreakDrawerOpen || isAppleShopOpen
+      ) && (
         <>
           <BoneAIFAB isOpen={isBoneAIOpen} onClick={() => setIsBoneAIOpen(!isBoneAIOpen)} />
           <BoneAIPopup isOpen={isBoneAIOpen} onClose={() => setIsBoneAIOpen(false)} />

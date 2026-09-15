@@ -1318,3 +1318,10 @@ body.focus-idle .fixed.bottom-4.right-4 {
     border-color: rgba(0, 240, 255, 0.4) !important;
   }
 }
+
+/* Hide Bone AI widget automatically whenever any popup or modal is open */
+body.modal-open .bone-ai-fab-container,
+body:has(.fixed.z-\[9999\]) .bone-ai-fab-container,
+body:has(.fixed.z-\[9999\]) [class*="BoneAIPopup"] {
+  display: none !important;
+}

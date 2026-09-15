@@ -1,37 +1,40 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { syllabusNEET } from '../data/syllabusNEET';
 import { syllabusJEE } from '../data/syllabusJEE';
-import { SyllabusChapter, SyllabusSubject } from '../types/syllabus';
+import { SyllabusSubject } from '../types/syllabus';
 import { useApp } from '../context/AppContext';
+import {
+  detectDocumentCorners,
+  warpAndEnhanceDocument,
+  segmentPageLayout,
+  DetectedBlock
+} from '../utils/scannerVision';
 import {
   Search,
   Flame,
   Atom,
   BookOpen,
-  RotateCcw,
   Check,
   Plus,
-  Sparkles,
   Camera,
-  Mic,
-  FileQuestion,
-  Image as ImageIcon,
-  Square,
-  Volume2,
   Trash2,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
   X,
-  Play,
-  Pause,
-  ArrowRight,
-  UploadCloud,
-  ChevronDown
+  Download,
+  Eye,
+  ScanLine,
+  Upload,
+  Image as ImageIcon,
+  PenTool,
+  RotateCcw,
+  RotateCw,
+  ChevronLeft,
+  Zap,
+  MoreVertical,
+  QrCode
 } from 'lucide-react';
 
 type ExamType = 'neet' | 'jee';
-type AddMode = 'auto' | 'photo' | 'voice';
+type AddMode = 'scan' | 'manual';
 
 export interface MistakeEntry {
   id: string;
@@ -41,14 +44,13 @@ export interface MistakeEntry {
   chapterId: string;
   chapterTitle: string;
   topicTitle: string;
-  sourceType: 'in_app' | 'photo' | 'voice';
-  sourceName?: string; // e.g. "NEET 2024 PYQ", "Allen Mock 3", "Camera Snap"
+  sourceType: 'in_app' | 'photo' | 'manual' | 'voice';
+  sourceName?: string;
   questionText: string;
   correctAnswer: string;
   explanation: string;
   mySlip: string;
   imageUrl?: string;
-  audioUrl?: string;
   isMastered: boolean;
   date: string;
 }
@@ -62,8 +64,8 @@ const DEFAULT_MISTAKES: MistakeEntry[] = [
     chapterId: 'np2',
     chapterTitle: 'Kinematics',
     topicTitle: 'Motion in a plane: Projectile motion',
-    sourceType: 'in_app',
-    sourceName: 'PYQ Drill 2024',
+    sourceType: 'manual',
+    sourceName: 'Practice Question',
     questionText: 'A projectile is thrown with velocity v at an angle theta. What is the radius of curvature of the trajectory at the highest point?',
     mySlip: 'I forgot that at the highest point velocity is purely horizontal (v cos theta) and acceleration is purely vertical (g).',
     correctAnswer: 'R = (v cos theta)^2 / g',
@@ -96,10 +98,10 @@ const DEFAULT_MISTAKES: MistakeEntry[] = [
     chapterId: 'jm1',
     chapterTitle: 'Sets, Relations and Functions',
     topicTitle: 'Types of relations: Equivalence relation',
-    sourceType: 'voice',
+    sourceType: 'manual',
     sourceName: 'Daily Practice Problem (DPP)',
     questionText: 'Let R be a relation on integers where aRb if and only if a - b is divisible by 5. Check if R is an equivalence relation.',
-    mySlip: 'Recorded voice note explaining why I forgot to verify transitivity for negative differences.',
+    mySlip: 'Forgot to verify transitivity for negative differences.',
     correctAnswer: 'R is Reflexive, Symmetric, and Transitive (Equivalence Relation).',
     explanation: 'Since a - a = 0 (divisible by 5), if 5 | (a - b) then 5 | (b - a). If 5 | (a - b) and 5 | (b - c), then 5 | (a - c). Hence all three hold.',
     isMastered: false,
@@ -110,7 +112,7 @@ const DEFAULT_MISTAKES: MistakeEntry[] = [
 export const MistakeTrackerPage: React.FC = () => {
   const { setCurrentRoute } = useApp();
 
-  // Exam selector: Exclusively NEET & JEE Main (identical to Flashcards page)
+  // Exam selector: Exclusively NEET & JEE Main
   const [selectedExam, setSelectedExam] = useState<ExamType>('neet');
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,29 +160,36 @@ export const MistakeTrackerPage: React.FC = () => {
     return activeSubject.name.replace(/\s*\(Theory:.*?\)/gi, '').replace(/\s*\(.*Marks\)/gi, '').trim();
   }, [activeSubject]);
 
-  // Add Mistake Modal State
+  // Modal State (3 Steps: 1 = Real Camera Scanner, 2 = Crop Screen, 3 = Syllabus Details)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [addMode, setAddMode] = useState<AddMode>('auto');
+  const [addStep, setAddStep] = useState<1 | 2 | 3>(1);
+  const [addMode, setAddMode] = useState<AddMode>('scan');
+
+  // Camera & Stream State
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const activeStreamRef = useRef<MediaStream | null>(null);
+  const [hasCamera, setHasCamera] = useState(false);
+  const [flashlightOn, setFlashlightOn] = useState(false);
+
+  // Raw Captured / Uploaded Image vs Final Cropped Image
+  const [rawImage, setRawImage] = useState<string | null>(null);
+  const [croppedImage, setCroppedImage] = useState<string | null>(null);
+  const [cropBox, setCropBox] = useState({ x: 0.05, y: 0.08, w: 0.9, h: 0.82 });
+  const [rotation, setRotation] = useState(0);
 
   // Form Fields
   const [formSubjectId, setFormSubjectId] = useState('');
   const [formChapterId, setFormChapterId] = useState('');
   const [formTopicTitle, setFormTopicTitle] = useState('');
   const [formCustomTopic, setFormCustomTopic] = useState('');
-  const [formSourceName, setFormSourceName] = useState('PYQ Practice');
+  const [formSourceName, setFormSourceName] = useState('Error Book Entry');
   const [formQuestionText, setFormQuestionText] = useState('');
   const [formMySlip, setFormMySlip] = useState('');
   const [formCorrectAnswer, setFormCorrectAnswer] = useState('');
   const [formExplanation, setFormExplanation] = useState('');
-  const [formImageBase64, setFormImageBase64] = useState<string | null>(null);
 
-  // Voice recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<any>(null);
+  // Lightbox View Full Image Modal
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Flipped card tracker for active cards
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
@@ -188,6 +197,58 @@ export const MistakeTrackerPage: React.FC = () => {
   const toggleFlip = (id: string) => {
     setFlippedCards(prev => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // File Inputs Ref
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper to strictly stop all camera & mic hardware tracks
+  const stopAllMediaTracks = () => {
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      activeStreamRef.current = null;
+    }
+  };
+
+  // Initialize camera stream when in Step 1 & Scan mode
+  useEffect(() => {
+    let isMounted = true;
+
+    async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }
+        });
+        if (isMounted) {
+          activeStreamRef.current = stream;
+          setHasCamera(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(() => {});
+          }
+        } else {
+          stream.getTracks().forEach(t => t.stop());
+        }
+      } catch (err) {
+        if (isMounted) setHasCamera(false);
+      }
+    }
+
+    if (isAddModalOpen && addStep === 1 && addMode === 'scan') {
+      startCamera();
+    } else {
+      stopAllMediaTracks();
+    }
+
+    return () => {
+      isMounted = false;
+      stopAllMediaTracks();
+    };
+  }, [isAddModalOpen, addStep, addMode]);
 
   // Synchronize form subject & chapters when modal opens
   useEffect(() => {
@@ -205,7 +266,6 @@ export const MistakeTrackerPage: React.FC = () => {
     }
   }, [isAddModalOpen, activeSubjectId, validSubjects]);
 
-  // Selected subject's chapters in form
   const formSelectedSubject = useMemo(() => {
     return validSubjects.find(s => s.id === formSubjectId);
   }, [validSubjects, formSubjectId]);
@@ -257,78 +317,118 @@ export const MistakeTrackerPage: React.FC = () => {
   // Delete mistake
   const handleDeleteMistake = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Delete this mistake card?')) {
+    if (window.confirm('Delete this card from Error Book?')) {
       setMistakes(prev => prev.filter(m => m.id !== id));
     }
   };
 
-  // Handle Photo / Image Upload
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Capture video frame & stop media stream immediately
+  const captureFrameToCrop = () => {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        setRawImage(dataUrl);
+
+        stopAllMediaTracks(); // Turn off camera hardware immediately
+        setAddStep(2); // Proceed to Interactive Crop Screen
+      }
+    }
+  };
+
+  // Gallery File Upload
+  const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onloadend = () => {
-      setFormImageBase64(reader.result as string);
+      setRawImage(reader.result as string);
+      stopAllMediaTracks();
+      setAddStep(2);
     };
     reader.readAsDataURL(file);
   };
 
-  // Voice recording handlers
-  const startRecording = async () => {
-    try {
-      audioChunksRef.current = [];
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setRecordedAudioUrl(reader.result as string);
-        };
-        reader.readAsDataURL(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start(100);
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      timerRef.current = setInterval(() => {
-        setRecordingSeconds(s => s + 1);
-      }, 1000);
-    } catch (err) {
-      alert('Microphone access could not be initialized. You can type your note or upload photo!');
+  // Apply Crop to Canvas & Proceed to Step 3
+  const applyCropAndProceed = () => {
+    if (!rawImage) {
+      setAddStep(3);
+      return;
     }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setCroppedImage(rawImage);
+        setAddStep(3);
+        return;
+      }
+
+      const cropX = img.width * cropBox.x;
+      const cropY = img.height * cropBox.y;
+      const cropW = Math.max(img.width * cropBox.w, 50);
+      const cropH = Math.max(img.height * cropBox.h, 50);
+
+      canvas.width = cropW;
+      canvas.height = cropH;
+
+      ctx.drawImage(
+        img,
+        cropX, cropY, cropW, cropH,
+        0, 0, cropW, cropH
+      );
+
+      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
+      setCroppedImage(croppedUrl);
+      setAddStep(3); // Proceed to Syllabus Details Step
+    };
+    img.onerror = () => {
+      setCroppedImage(rawImage);
+      setAddStep(3);
+    };
+    img.src = rawImage;
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
+  // Download image helper
+  const handleDownloadImage = (url: string, filename = 'error_book_image.png') => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  // Save new mistake
+  // Close modal & stop media streams cleanly
+  const handleCloseModal = () => {
+    stopAllMediaTracks();
+    setIsAddModalOpen(false);
+    setAddStep(1);
+    setRawImage(null);
+    setCroppedImage(null);
+  };
+
+  // Save new mistake entry to Error Book
   const handleSaveMistake = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formQuestionText && !formImageBase64 && !recordedAudioUrl) {
-      alert('Please provide question text, upload a photo, or record a voice note.');
+    const finalImg = croppedImage || rawImage;
+
+    if (!formQuestionText && !finalImg) {
+      alert('Please scan/upload an image or type your question statement.');
       return;
     }
 
     const currentSubj = validSubjects.find(s => s.id === formSubjectId) || validSubjects[0];
     const currentCh = (currentSubj?.chapters || []).find(c => c.id === formChapterId) || currentSubj?.chapters[0];
-
     const finalTopic = formTopicTitle === '__custom' ? formCustomTopic : formTopicTitle;
 
     const newEntry: MistakeEntry = {
@@ -339,33 +439,29 @@ export const MistakeTrackerPage: React.FC = () => {
       chapterId: currentCh?.id || 'ch1',
       chapterTitle: currentCh?.title || 'Chapter',
       topicTitle: finalTopic || 'General Topic',
-      sourceType: addMode === 'photo' ? 'photo' : addMode === 'voice' ? 'voice' : 'in_app',
-      sourceName: formSourceName || (addMode === 'photo' ? 'Photo Upload' : addMode === 'voice' ? 'Voice Note' : 'In-App Drill'),
-      questionText: formQuestionText || (formImageBase64 ? 'Question captured via photo' : 'Question described in voice note'),
+      sourceType: finalImg ? 'photo' : 'manual',
+      sourceName: formSourceName || (finalImg ? 'Scanner Crop' : 'Manual Question Entry'),
+      questionText: formQuestionText || 'Scanned question',
       mySlip: formMySlip,
       correctAnswer: formCorrectAnswer || 'Refer to explanation',
       explanation: formExplanation || 'Reviewed concept',
-      imageUrl: formImageBase64 || undefined,
-      audioUrl: recordedAudioUrl || undefined,
+      imageUrl: finalImg || undefined,
       isMastered: false,
       date: new Date().toISOString().split('T')[0]
     };
 
     setMistakes(prev => [newEntry, ...prev]);
 
-    // Reset Form
-    setIsAddModalOpen(false);
+    handleCloseModal();
     setFormQuestionText('');
     setFormMySlip('');
     setFormCorrectAnswer('');
     setFormExplanation('');
-    setFormImageBase64(null);
-    setRecordedAudioUrl(null);
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-16">
-      {/* Top Control Bar: Search + Exam Selector (Exclusively NEET & JEE Main, exactly like FlashcardsPage) */}
+      {/* Top Control Bar: Search + Exam Selector */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
         {/* Global Search */}
         <div className="relative flex-1 max-w-xl">
@@ -374,14 +470,13 @@ export const MistakeTrackerPage: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search mistakes by chapter, topic, question, or formula..."
+            placeholder="Search Error Book by chapter, topic, question, or formula..."
             className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl py-3 pl-12 pr-4 text-sm text-[var(--text-primary)] placeholder:text-gray-500 focus:outline-none focus:border-[var(--color-primary)] shadow-sm transition-all"
           />
         </div>
 
-        {/* Right Actions: Exam Toggle + Add Mistake Button */}
+        {/* Right Actions: Exam Toggle + Log Error Button */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Exam Mode Toggle: Exclusively NEET & JEE Main */}
           <div className="flex items-center gap-2 bg-[var(--bg-surface)] p-1 rounded-full border border-[var(--border-color)]">
             <button
               onClick={() => setSelectedExam('neet')}
@@ -408,16 +503,16 @@ export const MistakeTrackerPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Quick Add Mistake Button */}
           <button
             onClick={() => {
-              setAddMode('auto');
+              setAddStep(1);
+              setAddMode('scan');
               setIsAddModalOpen(true);
             }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--color-primary)] hover:opacity-90 text-black font-black text-sm shadow-[0_0_20px_rgba(0,240,255,0.25)] hover:scale-105 active:scale-95 transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:opacity-90 text-black font-black text-sm shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:scale-105 active:scale-95 transition-all"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Add Mistake</span>
+            <ScanLine className="w-4 h-4 stroke-[2.5]" />
+            <span>+ Add Error Question</span>
           </button>
         </div>
       </div>
@@ -449,22 +544,20 @@ export const MistakeTrackerPage: React.FC = () => {
         })}
       </div>
 
-      {/* Sticky Progress Bar (Identical to Flashcard & Syllabus Tracker design) */}
+      {/* Sticky Progress Bar */}
       {activeSubject && (
         <div className="sticky top-[72px] z-20 mb-5 pt-2">
           <div className="relative overflow-hidden bg-[var(--bg-surface-solid)]/70 border border-white/10 backdrop-blur-xl rounded-2xl px-4 sm:px-6 py-4 shadow-xl">
-            {/* Background glowing ambient light */}
             <div
               className="absolute -top-10 -right-10 w-36 h-36 bg-emerald-500 rounded-full blur-[70px] pointer-events-none transition-opacity duration-1000"
               style={{ opacity: percentage > 0 ? 0.25 : 0.05 }}
             />
 
-            {/* Header info row */}
             <div className="flex items-center justify-between gap-3 mb-3 relative z-10">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm sm:text-base font-extrabold text-white truncate">
-                    {masteredInSubject} of {totalInSubject} mistakes mastered in {cleanSubjectName}
+                    {masteredInSubject} of {totalInSubject} errors resolved in {cleanSubjectName}
                   </h3>
                   {percentage === 100 && totalInSubject > 0 && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
@@ -473,26 +566,24 @@ export const MistakeTrackerPage: React.FC = () => {
                   )}
                 </div>
                 <span className="text-[11px] sm:text-xs text-gray-400">
-                  Target: Convert negative marks into rank by mastering every test slip.
+                  Target: Master every mistake to maximize your score in {selectedExam.toUpperCase()}.
                 </span>
               </div>
 
-              {/* Add Mistake Shortcut */}
               <button
                 onClick={() => {
-                  setAddMode('auto');
+                  setAddStep(1);
+                  setAddMode('scan');
                   setIsAddModalOpen(true);
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-black bg-[var(--color-primary)] hover:opacity-90 shadow-md transition-all shrink-0"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span className="hidden sm:inline">Log Slip</span>
+                <span className="hidden sm:inline">Add Error</span>
               </button>
             </div>
 
-            {/* Main Progress Row */}
             <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-              {/* Stepped Capsule Bar */}
               <div className="flex-1 flex flex-col gap-1 min-w-0">
                 <div className="relative h-3 sm:h-5 w-full bg-white/10 border border-white/15 rounded-full shadow-inner overflow-hidden p-0.5 flex items-center">
                   <div
@@ -505,7 +596,6 @@ export const MistakeTrackerPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Percentage Indicator */}
               <div className="shrink-0 text-xs sm:text-sm font-black text-emerald-400">
                 {percentage}% Mastered
               </div>
@@ -514,90 +604,25 @@ export const MistakeTrackerPage: React.FC = () => {
         </div>
       )}
 
-      {/* 3 Easy Ways Banner Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Way 1: In-App Auto-Log */}
-        <div
-          onClick={() => {
-            setAddMode('auto');
-            setIsAddModalOpen(true);
-          }}
-          className="p-4 rounded-2xl bg-[var(--bg-surface-solid)]/40 border border-white/10 hover:border-[var(--color-cyan)]/50 cursor-pointer transition-all hover:scale-[1.01] flex items-center gap-3 group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 group-hover:scale-110 transition-transform">
-            <FileQuestion className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-[var(--color-cyan)] transition-colors">
-              1. In-App Questions & PYQ
-            </h4>
-            <p className="text-[11px] text-white/50 truncate">
-              Auto-logged from mock tests, DPPs, and practice
-            </p>
-          </div>
-        </div>
-
-        {/* Way 2: Photo / Camera */}
-        <div
-          onClick={() => {
-            setAddMode('photo');
-            setIsAddModalOpen(true);
-          }}
-          className="p-4 rounded-2xl bg-[var(--bg-surface-solid)]/40 border border-white/10 hover:border-emerald-400/50 cursor-pointer transition-all hover:scale-[1.01] flex items-center gap-3 group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 group-hover:scale-110 transition-transform">
-            <Camera className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
-              2. Photo Upload or Snap
-            </h4>
-            <p className="text-[11px] text-white/50 truncate">
-              Snap textbook or test paper question with solution
-            </p>
-          </div>
-        </div>
-
-        {/* Way 3: Voice Note */}
-        <div
-          onClick={() => {
-            setAddMode('voice');
-            setIsAddModalOpen(true);
-          }}
-          className="p-4 rounded-2xl bg-[var(--bg-surface-solid)]/40 border border-white/10 hover:border-purple-400/50 cursor-pointer transition-all hover:scale-[1.01] flex items-center gap-3 group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 group-hover:scale-110 transition-transform">
-            <Mic className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-purple-400 transition-colors">
-              3. Record Voice Note
-            </h4>
-            <p className="text-[11px] text-white/50 truncate">
-              Speak what went wrong and how to solve next time
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Mistake Cards Grid (Designed like Flashcard Deck Cards) */}
+      {/* Cards Grid */}
       {subjectMistakes.length === 0 ? (
         <div className="p-12 text-center bg-[var(--bg-surface-solid)]/30 border border-white/10 rounded-3xl space-y-4">
           <div className="w-14 h-14 mx-auto rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
             <BookOpen className="w-7 h-7 text-[var(--color-primary)]" />
           </div>
-          <h3 className="text-lg font-bold text-white">No Mistakes Logged For This Subject</h3>
+          <h3 className="text-lg font-bold text-white">No Errors Logged For {cleanSubjectName}</h3>
           <p className="text-xs text-white/50 max-w-sm mx-auto">
-            Log errors from tests, snap a photo, or record a quick voice note to build your personal topper error notebook.
+            Scan your test paper with Document Scanner or type your question statement manually to add it to Error Book.
           </p>
           <button
             onClick={() => {
-              setAddMode('auto');
+              setAddStep(1);
+              setAddMode('scan');
               setIsAddModalOpen(true);
             }}
             className="px-5 py-2 rounded-full bg-[var(--color-primary)] text-black text-xs font-bold shadow-lg"
           >
-            + Add First Mistake
+            + Add First Error Question
           </button>
         </div>
       ) : (
@@ -609,27 +634,27 @@ export const MistakeTrackerPage: React.FC = () => {
               <div
                 key={entry.id}
                 onClick={() => toggleFlip(entry.id)}
-                className={`relative min-h-[300px] p-6 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group shadow-lg ${
+                className={`relative min-h-[280px] p-5 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group shadow-lg ${
                   entry.isMastered
                     ? 'bg-emerald-950/20 border-emerald-500/30'
                     : 'bg-[var(--bg-surface-solid)]/60 border-white/10 hover:border-[var(--color-cyan)]/50'
                 }`}
               >
-                {/* Top Badge Row */}
+                {/* Top Badge & Action Row */}
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/40 text-[var(--color-primary)]">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/40 text-[var(--color-primary)] truncate max-w-[150px]">
                         {entry.chapterTitle}
                       </span>
                       {entry.sourceType === 'photo' && (
-                        <span className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400" title="Photo Attached">
+                        <span className="p-1 rounded-lg bg-cyan-500/20 text-cyan-400" title="Photo Attached">
                           <Camera className="w-3.5 h-3.5" />
                         </span>
                       )}
-                      {entry.sourceType === 'voice' && (
-                        <span className="p-1 rounded-lg bg-purple-500/20 text-purple-400" title="Voice Note Recorded">
-                          <Mic className="w-3.5 h-3.5" />
+                      {entry.sourceType === 'manual' && (
+                        <span className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400" title="Manual Text Entry">
+                          <PenTool className="w-3.5 h-3.5" />
                         </span>
                       )}
                     </div>
@@ -657,52 +682,62 @@ export const MistakeTrackerPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Topic Pill */}
                   <div className="text-[11px] font-semibold text-white/50 mb-2 truncate">
                     Topic: <span className="text-white/80">{entry.topicTitle}</span>
                   </div>
 
-                  {/* FLIP CONTENT */}
+                  {/* FLIP CARD CONTENT */}
                   {!isFlipped ? (
-                    /* FRONT: Question & What went wrong */
+                    /* FRONT SIDE: Image Preview (Natural Aspect Ratio) & Question Text */
                     <div className="space-y-3">
-                      {/* Image Thumbnail if photo attached */}
+                      {/* Dynamically Sized Image Container (No Black Padding Gaps!) */}
                       {entry.imageUrl && (
-                        <div className="w-full h-32 rounded-2xl overflow-hidden border border-white/10 bg-black/40 relative">
+                        <div className="relative w-full rounded-2xl overflow-hidden border border-white/15 bg-[#0e111d] max-h-56 flex items-center justify-center">
                           <img
                             src={entry.imageUrl}
                             alt="Question Photo"
-                            className="w-full h-full object-contain"
+                            className="w-full max-h-56 object-contain rounded-2xl"
                           />
+                          {/* Top-Right Overlay Buttons: View Full & Download ONLY */}
+                          <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/85 backdrop-blur-md px-2 py-1 rounded-xl border border-white/20 z-10 shadow-lg">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLightboxImage(entry.imageUrl || null);
+                              }}
+                              className="p-1 text-white/80 hover:text-cyan-400 transition-colors"
+                              title="See Full / View Image"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (entry.imageUrl) handleDownloadImage(entry.imageUrl);
+                              }}
+                              className="p-1 text-white/80 hover:text-emerald-400 transition-colors"
+                              title="Download Image"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       )}
 
-                      {/* Question Text */}
-                      <p className="text-xs sm:text-sm font-semibold text-white leading-relaxed line-clamp-4">
+                      <p className="text-xs sm:text-sm font-semibold text-white leading-relaxed line-clamp-5">
                         {entry.questionText}
                       </p>
 
-                      {/* Voice Note Player if recorded */}
-                      {entry.audioUrl && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 flex items-center gap-2"
-                        >
-                          <Volume2 className="w-4 h-4 text-purple-400 shrink-0" />
-                          <audio controls src={entry.audioUrl} className="w-full h-7" />
-                        </div>
-                      )}
-
-                      {/* My Slip Note */}
                       {entry.mySlip && (
                         <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-xs text-rose-200 leading-snug">
-                          <span className="font-bold text-rose-400 text-[10px] block uppercase">My Mistake / Slip:</span>
+                          <span className="font-bold text-rose-400 text-[10px] block uppercase">MY MISTAKE / SLIP:</span>
                           {entry.mySlip}
                         </div>
                       )}
                     </div>
                   ) : (
-                    /* BACK: Correct Answer & Explanation */
+                    /* BACK SIDE: Solution & Explanation */
                     <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200">
                       <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200">
                         <span className="font-bold text-emerald-400 text-[10px] block uppercase">Correct Answer:</span>
@@ -710,16 +745,16 @@ export const MistakeTrackerPage: React.FC = () => {
                       </div>
 
                       <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white/90 leading-relaxed">
-                        <span className="font-bold text-[var(--color-cyan)] text-[10px] block uppercase">Explanation & Takeaway:</span>
+                        <span className="font-bold text-[var(--color-cyan)] text-[10px] block uppercase">Explanation:</span>
                         {entry.explanation}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Bottom Card Footer */}
+                {/* Footer */}
                 <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-white/40">
-                  <span>{entry.sourceName || 'Self Practice'}</span>
+                  <span>{entry.sourceName || 'Error Book Card'}</span>
                   <span className="text-[var(--color-primary)] font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                     {isFlipped ? 'Show Question ↺' : 'Flip for Solution ↻'}
                   </span>
@@ -730,335 +765,461 @@ export const MistakeTrackerPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: SIMPLE 3 WAYS TO ADD MISTAKE */}
+      {/* ERROR LOGGING MODAL: DOCUMENT SCANNER vs MANUAL PARAGRAPH ENTRY */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-[var(--bg-surface-solid)] border border-white/20 rounded-3xl p-6 sm:p-8 max-w-2xl w-full my-6 space-y-5 shadow-2xl relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="bg-[#0b0e1b] border border-white/20 rounded-3xl p-6 sm:p-8 max-w-2xl w-full my-6 space-y-5 shadow-2xl relative overflow-hidden">
+            
             <button
-              onClick={() => setIsAddModalOpen(false)}
-              className="absolute right-5 top-5 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              onClick={handleCloseModal}
+              className="absolute right-5 top-5 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors z-20"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Modal Header */}
-            <div>
+            <div className="relative z-10">
               <h2 className="text-xl font-bold text-white font-heading flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[var(--color-primary)]" />
-                <span>Log Question Mistake</span>
+                <ScanLine className="w-6 h-6 text-cyan-400" />
+                <span>Add Question to Error Book</span>
               </h2>
               <p className="text-xs text-white/60 mt-0.5">
-                Select from syllabus chapters & topics, and record your slip using your preferred method.
+                Scan via camera scanner or type/paste your question statement manually.
               </p>
             </div>
 
-            {/* 3 WAYS TABS */}
-            <div className="grid grid-cols-3 gap-2 p-1 bg-black/40 border border-white/10 rounded-2xl">
+            {/* STEP 1: MODE SELECTOR (PHOTO SCAN vs MANUAL QUESTION TEXT) */}
+            {addStep === 1 && (
+              <div className="space-y-5 relative z-10 animate-in fade-in duration-200">
+                {/* 2 Clean Modes: Photo Scanner vs Manual Question Paragraph */}
+                <div className="grid grid-cols-2 gap-2 p-1 bg-black/50 border border-white/10 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setAddMode('scan')}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      addMode === 'scan'
+                        ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-black shadow-md'
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Camera Scanner</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAddMode('manual')}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      addMode === 'manual'
+                        ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-black shadow-md'
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                  >
+                    <PenTool className="w-4 h-4" />
+                    <span>Manual Question Entry</span>
+                  </button>
+                </div>
+
+                {/* MODE 1: LIVE CAMERA SCANNER BOX (NO FAKE STATIC BOX!) */}
+                {addMode === 'scan' && (
+                  <div className="space-y-4">
+                    <div className="relative w-full h-64 rounded-2xl bg-black border border-white/15 overflow-hidden flex items-center justify-center">
+                      
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+
+                      {!hasCamera && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#18181b] text-white/60 space-y-2">
+                          <Camera className="w-10 h-10 text-amber-400 animate-pulse" />
+                          <p className="text-xs font-semibold text-white">Align question inside frame</p>
+                          <p className="text-[11px] text-white/40">Real camera detector active</p>
+                        </div>
+                      )}
+
+                      {/* Dynamic Camera Focus & Corner Guides */}
+                      <div className="absolute inset-8 pointer-events-none z-20">
+                        <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/50 rounded-tl-lg" />
+                        <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/50 rounded-tr-lg" />
+                        <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/50 rounded-br-lg" />
+                        <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/50 rounded-bl-lg" />
+                      </div>
+                    </div>
+
+                    <input
+                      ref={galleryInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleGalleryFileChange}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={captureFrameToCrop}
+                        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold text-xs hover:bg-cyan-500/30 transition-all"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Snap Photo</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 font-bold text-xs hover:bg-purple-500/30 transition-all"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>Upload from gallery</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE 2: MANUAL QUESTION PARAGRAPH ENTRY */}
+                {addMode === 'manual' && (
+                  <div className="space-y-3">
+                    <label className="text-xs font-semibold text-white/80 block">
+                      Type or Paste Question Statement / Paragraph *
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={formQuestionText}
+                      onChange={(e) => setFormQuestionText(e.target.value)}
+                      placeholder="Type or paste full error question text, formula, or textbook paragraph here..."
+                      className="w-full px-4 py-3 bg-black/50 border border-white/15 rounded-2xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-emerald-400 resize-none leading-relaxed"
+                    />
+                  </div>
+                )}
+
+                {/* Advance to Step 2 */}
+                <button
+                  type="button"
+                  onClick={() => setAddStep(2)}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-black text-xs shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                >
+                  <span>Step 2: Syllabus & Solution Details →</span>
+                </button>
+              </div>
+            )}
+
+            {/* STEP 2: INTERACTIVE CROP SCREEN (IF PHOTO) */}
+            {addStep === 2 && (
+              <div className="space-y-4 relative z-10 animate-in fade-in duration-200">
+                {rawImage ? (
+                  <div className="space-y-3">
+                    <span className="text-xs font-bold text-white/80 block">Adjust Crop Boundary & Orientation</span>
+                    <div className="relative w-full max-h-60 rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-white/15 p-2">
+                      <img src={rawImage} alt="Captured" className="max-h-56 object-contain rounded-xl" />
+                      <div
+                        className="absolute border-2 border-amber-400 rounded-xl pointer-events-none"
+                        style={{
+                          top: `${cropBox.y * 100}%`,
+                          left: `${cropBox.x * 100}%`,
+                          width: `${cropBox.w * 100}%`,
+                          height: `${cropBox.h * 100}%`
+                        }}
+                      >
+                        <div className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
+                        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
+                        <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
+                        <div className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setAddStep(1)}
+                        className="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold"
+                      >
+                        Retake
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={applyCropAndProceed}
+                        className="px-6 py-2.5 rounded-xl bg-amber-400 text-black font-bold text-xs shadow-lg"
+                      >
+                        Save Crop & Continue →
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* If manual mode, proceed directly to details */
+                  <form onSubmit={handleSaveMistake} className="space-y-4">
+                    {/* SYLLABUS CASCADING SELECTORS */}
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                      <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider block">
+                        Syllabus Subject & Chapter ({selectedExam.toUpperCase()})
+                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-semibold text-white/70 block mb-1">Subject *</label>
+                          <select
+                            value={formSubjectId}
+                            onChange={(e) => {
+                              const newSubjId = e.target.value;
+                              setFormSubjectId(newSubjId);
+                              const subj = validSubjects.find(s => s.id === newSubjId);
+                              if (subj?.chapters && subj.chapters.length > 0) {
+                                setFormChapterId(subj.chapters[0].id);
+                                setFormTopicTitle(subj.chapters[0].topics?.[0]?.title || '');
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white"
+                          >
+                            {validSubjects.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name.replace(/\s*\(Theory:.*?\)/gi, '').trim()}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-white/70 block mb-1">Chapter *</label>
+                          <select
+                            value={formChapterId}
+                            onChange={(e) => {
+                              const chId = e.target.value;
+                              setFormChapterId(chId);
+                              const ch = formChapters.find(c => c.id === chId);
+                              if (ch?.topics && ch.topics.length > 0) {
+                                setFormTopicTitle(ch.topics[0].title);
+                              } else {
+                                setFormTopicTitle('');
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white"
+                          >
+                            {formChapters.map(ch => (
+                              <option key={ch.id} value={ch.id}>
+                                {ch.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Where I Went Wrong (My Slip)"
+                        value={formMySlip}
+                        onChange={(e) => setFormMySlip(e.target.value)}
+                        className="w-full px-3 py-2 bg-rose-950/20 border border-rose-500/25 rounded-xl text-xs text-white placeholder-rose-200/30"
+                      />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="Correct Answer"
+                          value={formCorrectAnswer}
+                          onChange={(e) => setFormCorrectAnswer(e.target.value)}
+                          className="w-full px-3 py-2 bg-emerald-950/20 border border-emerald-500/25 rounded-xl text-xs text-white placeholder-emerald-200/30"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Explanation / Solution"
+                          value={formExplanation}
+                          onChange={(e) => setFormExplanation(e.target.value)}
+                          className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setAddStep(1)}
+                        className="px-4 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white text-xs font-semibold"
+                      >
+                        ← Step 1
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-black text-xs shadow-lg"
+                      >
+                        Save to Error Book
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* STEP 3: FINAL SYLLABUS MAPPING & SAVE */}
+            {addStep === 3 && (
+              <form onSubmit={handleSaveMistake} className="space-y-4 relative z-10 animate-in fade-in duration-200">
+                {/* SYLLABUS CASCADING SELECTORS */}
+                <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                  <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider block">
+                    Syllabus Subject & Chapter ({selectedExam.toUpperCase()})
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-white/70 block mb-1">Subject *</label>
+                      <select
+                        value={formSubjectId}
+                        onChange={(e) => {
+                          const newSubjId = e.target.value;
+                          setFormSubjectId(newSubjId);
+                          const subj = validSubjects.find(s => s.id === newSubjId);
+                          if (subj?.chapters && subj.chapters.length > 0) {
+                            setFormChapterId(subj.chapters[0].id);
+                            setFormTopicTitle(subj.chapters[0].topics?.[0]?.title || '');
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                      >
+                        {validSubjects.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name.replace(/\s*\(Theory:.*?\)/gi, '').trim()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-white/70 block mb-1">Chapter *</label>
+                      <select
+                        value={formChapterId}
+                        onChange={(e) => {
+                          const chId = e.target.value;
+                          setFormChapterId(chId);
+                          const ch = formChapters.find(c => c.id === chId);
+                          if (ch?.topics && ch.topics.length > 0) {
+                            setFormTopicTitle(ch.topics[0].title);
+                          } else {
+                            setFormTopicTitle('');
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-[#121629] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                      >
+                        {formChapters.map(ch => (
+                          <option key={ch.id} value={ch.id}>
+                            {ch.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-white/70 block mb-1">Question Statement / Description</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Type question or summary of what was asked..."
+                      value={formQuestionText}
+                      onChange={(e) => setFormQuestionText(e.target.value)}
+                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-rose-300 block mb-1">Where I Went Wrong (My Slip)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Calculation error, misread options, or formula mix-up"
+                      value={formMySlip}
+                      onChange={(e) => setFormMySlip(e.target.value)}
+                      className="w-full px-3 py-2 bg-rose-950/20 border border-rose-500/25 rounded-xl text-xs text-white placeholder-rose-200/30 focus:outline-none focus:border-rose-400"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-emerald-300 block mb-1">Correct Answer</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Option B"
+                        value={formCorrectAnswer}
+                        onChange={(e) => setFormCorrectAnswer(e.target.value)}
+                        className="w-full px-3 py-2 bg-emerald-950/20 border border-emerald-500/25 rounded-xl text-xs text-white placeholder-emerald-200/30 focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-cyan-300 block mb-1">Explanation / Solution</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Key formula or concept..."
+                        value={formExplanation}
+                        onChange={(e) => setFormExplanation(e.target.value)}
+                        className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setAddStep(1)}
+                    className="px-4 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white text-xs font-semibold"
+                  >
+                    ← Step 1
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-black text-xs shadow-lg hover:opacity-90 transition-all"
+                  >
+                    Save to Error Book
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX FULL IMAGE MODAL */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-lg"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
               <button
-                type="button"
-                onClick={() => setAddMode('auto')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                  addMode === 'auto'
-                    ? 'bg-[var(--color-primary)] text-black shadow-md'
-                    : 'text-white/60 hover:text-white'
-                }`}
+                onClick={() => handleDownloadImage(lightboxImage)}
+                className="flex items-center gap-1 text-xs font-bold text-white hover:text-emerald-400 transition-colors"
+                title="Download Image"
               >
-                <FileQuestion className="w-4 h-4" />
-                <span className="truncate">In-App / PYQ</span>
+                <Download className="w-4 h-4" />
+                <span>Download</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setAddMode('photo')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                  addMode === 'photo'
-                    ? 'bg-emerald-500 text-black shadow-md'
-                    : 'text-white/60 hover:text-white'
-                }`}
-              >
-                <Camera className="w-4 h-4" />
-                <span className="truncate">Photo Upload</span>
-              </button>
+              <div className="w-px h-4 bg-white/20" />
 
               <button
-                type="button"
-                onClick={() => setAddMode('voice')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                  addMode === 'voice'
-                    ? 'bg-purple-500 text-black shadow-md'
-                    : 'text-white/60 hover:text-white'
-                }`}
+                onClick={() => setLightboxImage(null)}
+                className="p-1 text-white/70 hover:text-white transition-colors"
               >
-                <Mic className="w-4 h-4" />
-                <span className="truncate">Voice Note</span>
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMistake} className="space-y-4">
-              {/* DYNAMIC SYLLABUS CASCADING DROPDOWNS: Subject -> Chapter -> Topic */}
-              <div className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-3">
-                <span className="text-[10px] font-black uppercase text-[var(--color-primary)] tracking-wider block">
-                  Syllabus Mapping ({selectedExam.toUpperCase()})
-                </span>
-
-                {/* Subject Selector */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Subject *</label>
-                    <select
-                      value={formSubjectId}
-                      onChange={(e) => {
-                        const newSubjId = e.target.value;
-                        setFormSubjectId(newSubjId);
-                        const subj = validSubjects.find(s => s.id === newSubjId);
-                        if (subj?.chapters && subj.chapters.length > 0) {
-                          setFormChapterId(subj.chapters[0].id);
-                          setFormTopicTitle(subj.chapters[0].topics?.[0]?.title || '');
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-[var(--bg-surface)] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-[var(--color-primary)]"
-                    >
-                      {validSubjects.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.name.replace(/\s*\(Theory:.*?\)/gi, '').trim()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Chapter Dropdown according to Syllabus */}
-                  <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Chapter according to Syllabus *</label>
-                    <select
-                      value={formChapterId}
-                      onChange={(e) => {
-                        const chId = e.target.value;
-                        setFormChapterId(chId);
-                        const ch = formChapters.find(c => c.id === chId);
-                        if (ch?.topics && ch.topics.length > 0) {
-                          setFormTopicTitle(ch.topics[0].title);
-                        } else {
-                          setFormTopicTitle('');
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-[var(--bg-surface)] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-[var(--color-primary)]"
-                    >
-                      {formChapters.map(ch => (
-                        <option key={ch.id} value={ch.id}>
-                          {ch.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Topic Dropdown according to Syllabus Chapter */}
-                <div>
-                  <label className="text-xs font-semibold text-white/70 block mb-1">Topic in Chapter *</label>
-                  <select
-                    value={formTopicTitle}
-                    onChange={(e) => setFormTopicTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--bg-surface)] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-[var(--color-primary)]"
-                  >
-                    {formTopics.map(t => (
-                      <option key={t.id} value={t.title}>
-                        {t.title}
-                      </option>
-                    ))}
-                    <option value="__custom">+ Other / Custom Topic</option>
-                  </select>
-
-                  {formTopicTitle === '__custom' && (
-                    <input
-                      type="text"
-                      placeholder="Enter custom topic name..."
-                      value={formCustomTopic}
-                      onChange={(e) => setFormCustomTopic(e.target.value)}
-                      className="w-full mt-2 px-3 py-2 bg-[var(--bg-surface)] border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-[var(--color-primary)]"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* MODE SPECIFIC INPUTS */}
-              {/* 1. AUTO / IN-APP DRILL MODE */}
-              {addMode === 'auto' && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-xl text-xs text-cyan-200">
-                    💡 <strong>In-App Integration:</strong> When you practice in PYQ Drill, Daily Test, or Test Series, any question you answer incorrectly can also be added here with 1-click!
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Source / Test Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. NEET 2024 PYQ, Allen Major 4, DPP #12"
-                      value={formSourceName}
-                      onChange={(e) => setFormSourceName(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[var(--color-primary)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Question Statement / Text *</label>
-                    <textarea
-                      rows={2}
-                      required
-                      placeholder="Type or paste the question text..."
-                      value={formQuestionText}
-                      onChange={(e) => setFormQuestionText(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[var(--color-primary)]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* 2. PHOTO UPLOAD MODE */}
-              {addMode === 'photo' && (
-                <div className="space-y-3">
-                  <div className="border-2 border-dashed border-white/20 hover:border-emerald-400/50 rounded-2xl p-4 text-center cursor-pointer transition-colors relative bg-black/30">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageFileChange}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                    />
-                    {formImageBase64 ? (
-                      <div className="space-y-2">
-                        <img
-                          src={formImageBase64}
-                          alt="Question Preview"
-                          className="max-h-40 mx-auto object-contain rounded-xl border border-white/10"
-                        />
-                        <span className="text-xs text-emerald-400 font-bold block">Photo uploaded! Click to change</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-1 text-white/60">
-                        <UploadCloud className="w-8 h-8 mx-auto text-emerald-400" />
-                        <p className="text-xs font-bold text-white">Click or Snap Photo of Question / Solution</p>
-                        <p className="text-[10px] text-white/40">Camera capture or gallery upload supported</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Optional Question Description</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Q17 on inclined plane friction"
-                      value={formQuestionText}
-                      onChange={(e) => setFormQuestionText(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[var(--color-primary)]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* 3. VOICE NOTE RECORDING MODE */}
-              {addMode === 'voice' && (
-                <div className="space-y-3">
-                  <div className="p-5 rounded-2xl bg-purple-950/20 border border-purple-500/30 text-center space-y-3">
-                    <div className="flex items-center justify-center gap-3">
-                      {!isRecording ? (
-                        <button
-                          type="button"
-                          onClick={startRecording}
-                          className="px-5 py-2.5 rounded-full bg-purple-500 hover:bg-purple-400 text-black font-black text-xs flex items-center gap-2 shadow-lg transition-all"
-                        >
-                          <Mic className="w-4 h-4" />
-                          <span>Start Recording Voice Note</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={stopRecording}
-                          className="px-5 py-2.5 rounded-full bg-rose-500 hover:bg-rose-400 text-white font-black text-xs flex items-center gap-2 animate-pulse shadow-lg transition-all"
-                        >
-                          <Square className="w-4 h-4 fill-current" />
-                          <span>Stop Recording ({recordingSeconds}s)</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {recordedAudioUrl && (
-                      <div className="mt-2 p-2 bg-black/40 rounded-xl flex items-center gap-2">
-                        <Volume2 className="w-4 h-4 text-purple-400" />
-                        <audio controls src={recordedAudioUrl} className="w-full h-8" />
-                      </div>
-                    )}
-                    <p className="text-[11px] text-white/50">
-                      Speak what confused you and the trick to remember.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-white/70 block mb-1">Brief Question Title</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Carnots engine efficiency formula"
-                      value={formQuestionText}
-                      onChange={(e) => setFormQuestionText(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[var(--color-primary)]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* COMMON FIELDS: What went wrong & Correct Answer / Explanation */}
-              <div className="space-y-3 pt-1 border-t border-white/10">
-                <div>
-                  <label className="text-xs font-semibold text-rose-300 block mb-1">Where I Went Wrong (My Slip)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Forgot minus sign, or confused potential with field"
-                    value={formMySlip}
-                    onChange={(e) => setFormMySlip(e.target.value)}
-                    className="w-full px-3 py-2 bg-rose-950/20 border border-rose-500/25 rounded-xl text-xs text-white placeholder-rose-200/30 focus:outline-none focus:border-rose-400"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-emerald-300 block mb-1">Correct Answer</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Option B / 45 m/s"
-                      value={formCorrectAnswer}
-                      onChange={(e) => setFormCorrectAnswer(e.target.value)}
-                      className="w-full px-3 py-2 bg-emerald-950/20 border border-emerald-500/25 rounded-xl text-xs text-white placeholder-emerald-200/30 focus:outline-none focus:border-emerald-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-[var(--color-cyan)] block mb-1">Explanation / Solution</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Key formula R = v^2 / g..."
-                      value={formExplanation}
-                      onChange={(e) => setFormExplanation(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[var(--color-cyan)]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded-xl bg-[var(--color-primary)] text-black font-black text-xs shadow-lg hover:opacity-90 transition-all"
-                >
-                  Save to Mistake Notebook
-                </button>
-              </div>
-            </form>
+            <img
+              src={lightboxImage}
+              alt="Full view"
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
           </div>
         </div>
       )}

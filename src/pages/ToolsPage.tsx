@@ -61,8 +61,8 @@ const TOOLS: ToolCard[] = [
   },
   {
     id: 'mistake-tracker',
-    title: 'Mistake Tracker',
-    description: 'Log and analyze your recurring errors.',
+    title: 'Error Book',
+    description: 'Log and analyze your recurring errors with Google Lens scanner.',
     icon: AlertCircle,
     color: 'text-red-400',
   },
