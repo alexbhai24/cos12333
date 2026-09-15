@@ -78,6 +78,63 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   // Lightbox View Image
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
+  // Live real-time document auto-detection state
+  const [detectedBox, setDetectedBox] = useState<{
+    isDetected: boolean;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    confidence: number;
+  }>({ isDetected: false, x: 0.05, y: 0.08, w: 0.9, h: 0.82, confidence: 0 });
+
+  // Real-time camera detection loop (runs while in Step 1)
+  useEffect(() => {
+    if (step !== 1) return;
+
+    let animFrameId: number;
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+
+    const sampleFrame = () => {
+      if (videoRef.current && videoRef.current.readyState === 4 && ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, 320, 240);
+        const corners = detectDocumentCorners(canvas, 0.05);
+        const textPresent = isDocumentOrTextPresent(canvas);
+
+        const w = (corners.bottomRight.x - corners.topLeft.x) / 320;
+        const h = (corners.bottomRight.y - corners.topLeft.y) / 240;
+        const x = corners.topLeft.x / 320;
+        const y = corners.topLeft.y / 240;
+
+        if (textPresent && w > 0.25 && h > 0.25) {
+          setDetectedBox({
+            isDetected: true,
+            x: Math.max(0.02, x),
+            y: Math.max(0.02, y),
+            w: Math.min(0.96, w),
+            h: Math.min(0.96, h),
+            confidence: 0.92
+          });
+        } else {
+          setDetectedBox(prev => ({ ...prev, isDetected: false }));
+        }
+      }
+      animFrameId = requestAnimationFrame(sampleFrame);
+    };
+
+    const timer = setTimeout(() => {
+      sampleFrame();
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(animFrameId);
+    };
+  }, [step]);
+
   // Syllabus mapping selection
   const currentSyllabus = selectedExam === 'neet' ? syllabusNEET : syllabusJEE;
   const validSubjects = useMemo(() => (currentSyllabus?.subjects || []).filter(Boolean), [currentSyllabus]);
@@ -349,9 +406,16 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Tooltip: Hold your camera still (MATCHING USER SCREENSHOT IMAGE 1) */}
-              <div className="px-4 py-1.5 rounded-full bg-[#3a3520]/80 border border-amber-400/40 backdrop-blur-md shadow-lg">
-                <p className="text-amber-300 font-bold text-xs">Hold your camera still.</p>
+              {/* Tooltip: Live Auto-Detector Status Badge */}
+              <div className={`px-4 py-1.5 rounded-full backdrop-blur-md shadow-lg border transition-all ${
+                detectedBox.isDetected
+                  ? 'bg-emerald-950/80 border-emerald-400/60 text-emerald-300'
+                  : 'bg-[#3a3520]/80 border-amber-400/40 text-amber-300'
+              }`}>
+                <p className="font-bold text-xs flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${detectedBox.isDetected ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'}`} />
+                  {detectedBox.isDetected ? '✓ Document / Question Auto-Detected' : 'Hold camera still — Auto-detecting...'}
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -366,7 +430,7 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
             </div>
 
-            {/* Center Live Camera Viewfinder + Bounding Detection Box (MATCHING USER SCREENSHOT IMAGE 1) */}
+            {/* Center Live Camera Viewfinder + Real-Time Bounding Detection Box */}
             <div className="relative flex-1 my-3 flex items-center justify-center overflow-hidden">
               <div className="relative w-full max-w-md h-full rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-white/10">
                 
@@ -387,19 +451,37 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   </div>
                 )}
 
-                {/* Dynamic Camera Focus & Document Edge Detector (ONLY SHOWS WHEN DOCUMENT/TEXT IS IN FOCUS) */}
-                <div className="absolute inset-10 pointer-events-none z-30 transition-all duration-300">
-                  {/* Subtle Corner Markers */}
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white/40 rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white/40 rounded-tr-lg" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white/40 rounded-br-lg" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white/40 rounded-bl-lg" />
+                {/* Real-Time Auto-Detected Bounding Box & Quad Corners */}
+                {detectedBox.isDetected ? (
+                  <div
+                    className="absolute border-2 border-amber-400 bg-amber-400/15 rounded-xl pointer-events-none z-30 transition-all duration-200 shadow-[0_0_30px_rgba(251,191,36,0.6)]"
+                    style={{
+                      top: `${detectedBox.y * 100}%`,
+                      left: `${detectedBox.x * 100}%`,
+                      width: `${detectedBox.w * 100}%`,
+                      height: `${detectedBox.h * 100}%`
+                    }}
+                  >
+                    {/* Glowing 4 Corner Yellow Handles */}
+                    <div className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
+                    <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
+                    <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
+                    <div className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-amber-400 border-2 border-white shadow-lg animate-pulse" />
 
-                  {/* Target Focus Dot */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-3 h-3 rounded-full border border-white/30 bg-white/10 backdrop-blur-xs" />
+                    {/* Scanning Beam Light Line */}
+                    <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent animate-bounce top-1/2" />
                   </div>
-                </div>
+                ) : (
+                  <div className="absolute inset-10 pointer-events-none z-30 transition-all duration-300">
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-amber-400/60 rounded-tl-lg" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-amber-400/60 rounded-tr-lg" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-amber-400/60 rounded-br-lg" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-amber-400/60 rounded-bl-lg" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-3 h-3 rounded-full border border-amber-400/40 bg-amber-400/20 backdrop-blur-xs" />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

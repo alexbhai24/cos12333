@@ -213,6 +213,62 @@ export const MistakeTrackerPage: React.FC = () => {
     }
   };
 
+  // Live real-time document auto-detection state
+  const [detectedBox, setDetectedBox] = useState<{
+    isDetected: boolean;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    confidence: number;
+  }>({ isDetected: false, x: 0.05, y: 0.08, w: 0.9, h: 0.82, confidence: 0 });
+
+  // Real-time camera detection loop (runs while in Step 1 & Scan mode)
+  useEffect(() => {
+    if (!isAddModalOpen || addStep !== 1 || addMode !== 'scan') return;
+
+    let animFrameId: number;
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+
+    const sampleFrame = () => {
+      if (videoRef.current && videoRef.current.readyState === 4 && ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, 320, 240);
+        const corners = detectDocumentCorners(canvas, 0.05);
+
+        const w = (corners.bottomRight.x - corners.topLeft.x) / 320;
+        const h = (corners.bottomRight.y - corners.topLeft.y) / 240;
+        const x = corners.topLeft.x / 320;
+        const y = corners.topLeft.y / 240;
+
+        if (w > 0.25 && h > 0.25) {
+          setDetectedBox({
+            isDetected: true,
+            x: Math.max(0.02, x),
+            y: Math.max(0.02, y),
+            w: Math.min(0.96, w),
+            h: Math.min(0.96, h),
+            confidence: 0.92
+          });
+        } else {
+          setDetectedBox(prev => ({ ...prev, isDetected: false }));
+        }
+      }
+      animFrameId = requestAnimationFrame(sampleFrame);
+    };
+
+    const timer = setTimeout(() => {
+      sampleFrame();
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(animFrameId);
+    };
+  }, [isAddModalOpen, addStep, addMode]);
+
   // Initialize camera stream when in Step 1 & Scan mode
   useEffect(() => {
     let isMounted = true;
@@ -841,13 +897,31 @@ export const MistakeTrackerPage: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Dynamic Camera Focus & Corner Guides */}
-                      <div className="absolute inset-8 pointer-events-none z-20">
-                        <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/50 rounded-tl-lg" />
-                        <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/50 rounded-tr-lg" />
-                        <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/50 rounded-br-lg" />
-                        <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/50 rounded-bl-lg" />
-                      </div>
+                      {/* Real-Time Auto-Detected Bounding Box & Quad Corners */}
+                      {detectedBox.isDetected ? (
+                        <div
+                          className="absolute border-2 border-amber-400 bg-amber-400/15 rounded-xl pointer-events-none z-30 transition-all duration-200 shadow-[0_0_30px_rgba(251,191,36,0.6)]"
+                          style={{
+                            top: `${detectedBox.y * 100}%`,
+                            left: `${detectedBox.x * 100}%`,
+                            width: `${detectedBox.w * 100}%`,
+                            height: `${detectedBox.h * 100}%`
+                          }}
+                        >
+                          <div className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
+                          <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
+                          <div className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
+                          <div className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-white shadow-lg animate-pulse" />
+                          <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent animate-bounce top-1/2" />
+                        </div>
+                      ) : (
+                        <div className="absolute inset-8 pointer-events-none z-20">
+                          <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-amber-400/60 rounded-tl-lg" />
+                          <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-amber-400/60 rounded-tr-lg" />
+                          <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-amber-400/60 rounded-br-lg" />
+                          <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-amber-400/60 rounded-bl-lg" />
+                        </div>
+                      )}
                     </div>
 
                     <input

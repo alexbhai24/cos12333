@@ -2,6 +2,68 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
+// Global singleton cache for preloading 3D skeleton model
+let cachedSkeletonGroup: THREE.Group | null = null;
+let loadPromise: Promise<THREE.Group> | null = null;
+
+export const preloadSkeletonModel = (): Promise<THREE.Group> => {
+  if (cachedSkeletonGroup) {
+    return Promise.resolve(cachedSkeletonGroup.clone());
+  }
+  if (loadPromise) {
+    return loadPromise.then((obj) => obj.clone());
+  }
+
+  loadPromise = new Promise((resolve, reject) => {
+    const loader = new OBJLoader();
+    loader.load(
+      '/skeleton/SubTool-0-3517926.OBJ',
+      (obj) => {
+        // Realistic Warm Natural Bone Shader
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xf3e6d3, // Warm natural bone tone
+          metalness: 0.04,
+          roughness: 0.36,
+          wireframe: false,
+          emissive: 0x2b2218,
+          emissiveIntensity: 0.12
+        });
+
+        obj.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            (child as THREE.Mesh).material = material;
+          }
+        });
+
+        // Center and scale model
+        const box = new THREE.Box3().setFromObject(obj);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 3.3 / maxDim;
+        obj.scale.set(scale, scale, scale);
+        obj.position.sub(center.multiplyScalar(scale));
+
+        cachedSkeletonGroup = obj;
+        resolve(obj.clone());
+      },
+      undefined,
+      (err) => {
+        console.error('Error loading 3D skeleton model:', err);
+        loadPromise = null;
+        reject(err);
+      }
+    );
+  });
+
+  return loadPromise;
+};
+
+// Immediately start preloading in background on app startup!
+if (typeof window !== 'undefined') {
+  preloadSkeletonModel().catch(() => {});
+}
+
 export const Skeleton3DViewer: React.FC<{ className?: string }> = ({ className }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,45 +102,18 @@ export const Skeleton3DViewer: React.FC<{ className?: string }> = ({ className }
 
     let skeletonMesh: THREE.Group | null = null;
     let animId: number;
+    let mounted = true;
 
-    // Load OBJ 3D Model
-    const loader = new OBJLoader();
-    loader.load(
-      '/skeleton/SubTool-0-3517926.OBJ',
-      (obj) => {
-        // Realistic Warm Natural Bone Shader
-        const material = new THREE.MeshStandardMaterial({
-          color: 0xf3e6d3, // Warm natural bone tone
-          metalness: 0.04,
-          roughness: 0.36,
-          wireframe: false,
-          emissive: 0x2b2218,
-          emissiveIntensity: 0.12
-        });
-
-        obj.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            (child as THREE.Mesh).material = material;
-          }
-        });
-
-        // Center and scale model
-        const box = new THREE.Box3().setFromObject(obj);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 3.3 / maxDim;
-        obj.scale.set(scale, scale, scale);
-        obj.position.sub(center.multiplyScalar(scale));
-
+    // Use preloaded cached model for INSTANT rendering on tab switch
+    preloadSkeletonModel()
+      .then((obj) => {
+        if (!mounted) return;
         scene.add(obj);
         skeletonMesh = obj;
-      },
-      undefined,
-      (err) => {
-        console.error('Error loading 3D skeleton model:', err);
-      }
-    );
+      })
+      .catch((err) => {
+        console.error('Failed to attach preloaded skeleton:', err);
+      });
 
     // Mouse drag rotation controls
     let isDragging = false;
@@ -131,6 +166,7 @@ export const Skeleton3DViewer: React.FC<{ className?: string }> = ({ className }
     window.addEventListener('resize', handleResize);
 
     return () => {
+      mounted = false;
       cancelAnimationFrame(animId);
       container.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
