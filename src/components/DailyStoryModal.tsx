@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Video, FileText, Sparkles, Trophy } from 'lucide-react';
+import { X, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Video, FileText, Sparkles } from 'lucide-react';
 import { DailyQuestion, SubjectKey } from '../types/dailyStatus';
 import { MathFormattedText } from './MathFormattedText';
 
 interface DailyStoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  subject: SubjectKey | 'streak';
+  subject: SubjectKey;
   questions: DailyQuestion[];
   userAnswers: Record<string, number>;
   onAnswer: (subject: SubjectKey, questionId: string, optionIndex: number) => void;
-  userStreak?: number;
-  onOpenStreakDrawer?: () => void;
 }
 
 export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
@@ -20,63 +18,12 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
   subject,
   questions,
   userAnswers,
-  onAnswer,
-  userStreak = 1,
-  onOpenStreakDrawer
+  onAnswer
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'text' | 'video'>('text');
 
   if (!isOpen) return null;
-
-  // Render Streak Info Modal if 'streak' is selected
-  if (subject === 'streak') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="relative w-full max-w-md bg-[#121624] border border-orange-500/30 rounded-3xl p-6 shadow-2xl space-y-6 text-center overflow-hidden">
-          <div className="absolute top-3 right-3">
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="w-20 h-20 mx-auto rounded-full bg-orange-500/15 border-2 border-orange-500/40 flex items-center justify-center shadow-[0_0_30px_rgba(249,115,22,0.3)]">
-            <span className="text-4xl">🔥</span>
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-black text-white font-heading">Cosmic Daily Streak</h2>
-            <p className="text-xs text-gray-400 mt-1">Keep your learning momentum active every single day!</p>
-          </div>
-
-          <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center justify-between">
-            <div className="text-left">
-              <div className="text-xs text-orange-300 font-bold uppercase tracking-wider">Current Active Streak</div>
-              <div className="text-2xl font-black text-white">{userStreak} Days Active</div>
-            </div>
-            <Trophy className="w-8 h-8 text-amber-400 animate-bounce" />
-          </div>
-
-          <p className="text-xs text-gray-300 leading-relaxed">
-            Answer the daily PCMB questions for Physics, Chemistry, Biology, and Math to earn 🍏 Apples and increment your streak multiplier!
-          </p>
-
-          <button
-            onClick={() => {
-              onClose();
-              if (onOpenStreakDrawer) onOpenStreakDrawer();
-            }}
-            className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-black font-extrabold text-sm rounded-xl transition-all shadow-lg active:scale-95"
-          >
-            Open Streak Society & Check-In 🔥
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const currentQ = questions[currentIndex];
   const selectedOption = currentQ ? userAnswers[currentQ.id] : undefined;
@@ -89,6 +36,7 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
   };
 
   const subjectTitles: Record<SubjectKey, { title: string; color: string; icon: string }> = {
+    nta_q: { title: 'NTA_Q (NTA Questions)', color: 'text-amber-400', icon: '🎯' },
     physics: { title: 'Physics', color: 'text-rose-400', icon: '⚛️' },
     chemistry: { title: 'Chemistry', color: 'text-cyan-400', icon: '🧪' },
     biology: { title: 'Biology', color: 'text-emerald-400', icon: '🧫' },
@@ -151,7 +99,7 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
         </div>
 
         {/* Question Text */}
-        {currentQ && (
+        {currentQ ? (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
             <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-semibold text-white leading-relaxed">
               <MathFormattedText text={currentQ.questionText} />
@@ -298,6 +246,10 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
                 )}
               </div>
             )}
+          </div>
+        ) : (
+          <div className="p-8 text-center text-xs text-gray-400 italic">
+            No questions available for this status category yet.
           </div>
         )}
 

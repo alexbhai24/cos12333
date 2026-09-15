@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Flame, Atom, FlaskConical, Dna, Calculator, Check } from 'lucide-react';
+import { Target, Atom, FlaskConical, Dna, Calculator, Check } from 'lucide-react';
 import { SubjectKey } from '../types/dailyStatus';
 import { useDailyStatus } from '../hooks/useDailyStatus';
 import { DailyStoryModal } from './DailyStoryModal';
@@ -9,29 +9,26 @@ interface DailyStatusBarProps {
   onOpenStreakDrawer?: () => void;
 }
 
-export const DailyStatusBar: React.FC<DailyStatusBarProps> = ({ onOpenStreakDrawer }) => {
-  const { user, setIsStreakDrawerOpen } = useApp();
+export const DailyStatusBar: React.FC<DailyStatusBarProps> = () => {
   const { questionsMap, userAnswers, completedSubjects, answerQuestion } = useDailyStatus();
 
-  const [activeSubject, setActiveSubject] = useState<SubjectKey | 'streak' | null>(null);
+  const [activeSubject, setActiveSubject] = useState<SubjectKey | null>(null);
 
   const statusItems: {
-    key: SubjectKey | 'streak';
+    key: SubjectKey;
     label: string;
     icon: React.ReactNode;
     ringColor: string;
     bgColor: string;
     textColor: string;
-    streakValue?: number;
   }[] = [
     {
-      key: 'streak',
-      label: 'Streak',
-      icon: <Flame className="w-6 h-6 text-orange-400" />,
-      ringColor: 'from-orange-500 via-amber-400 to-yellow-500',
-      bgColor: 'bg-orange-500/10 border-orange-500/30',
-      textColor: 'text-orange-400',
-      streakValue: user?.streak || 1
+      key: 'nta_q',
+      label: 'NTA_Q',
+      icon: <Target className="w-6 h-6 text-amber-400" />,
+      ringColor: 'from-amber-500 via-yellow-400 to-orange-500',
+      bgColor: 'bg-amber-500/10 border-amber-500/30',
+      textColor: 'text-amber-400'
     },
     {
       key: 'physics',
@@ -67,7 +64,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = ({ onOpenStreakDraw
     }
   ];
 
-  const handleOpenSubject = (key: SubjectKey | 'streak') => {
+  const handleOpenSubject = (key: SubjectKey) => {
     setActiveSubject(key);
   };
 
@@ -79,14 +76,14 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = ({ onOpenStreakDraw
           Question of the Day
         </h2>
         <span className="text-[10px] font-semibold text-[var(--color-cyan)] bg-[var(--color-cyan)]/10 border border-[var(--color-cyan)]/30 px-2.5 py-0.5 rounded-full">
-          Daily PCMB Stories
+          NTA_Q & PCMB Stories
         </span>
       </div>
 
       {/* Stories Circle Row */}
       <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto pb-1 pt-1 no-scrollbar justify-start sm:justify-around">
         {statusItems.map((item) => {
-          const isCompleted = item.key !== 'streak' && completedSubjects.includes(item.key as string);
+          const isCompleted = completedSubjects.includes(item.key);
 
           return (
             <div
@@ -104,16 +101,7 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = ({ onOpenStreakDraw
               >
                 {/* Inner Circle Icon Container */}
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#121624] border border-white/10 flex flex-col items-center justify-center p-2 relative shadow-inner">
-                  {item.key === 'streak' ? (
-                    <>
-                      {item.icon}
-                      <span className="text-[11px] font-black text-orange-400 font-sans -mt-1">
-                        {item.streakValue}
-                      </span>
-                    </>
-                  ) : (
-                    item.icon
-                  )}
+                  {item.icon}
 
                   {/* Completed Checkmark Badge */}
                   {isCompleted && (
@@ -143,14 +131,9 @@ export const DailyStatusBar: React.FC<DailyStatusBarProps> = ({ onOpenStreakDraw
           isOpen={!!activeSubject}
           onClose={() => setActiveSubject(null)}
           subject={activeSubject}
-          questions={activeSubject !== 'streak' ? questionsMap[activeSubject] || [] : []}
-          userAnswers={activeSubject !== 'streak' ? userAnswers[activeSubject] || {} : {}}
+          questions={questionsMap[activeSubject] || []}
+          userAnswers={userAnswers[activeSubject] || {}}
           onAnswer={answerQuestion}
-          userStreak={user?.streak || 1}
-          onOpenStreakDrawer={() => {
-            if (onOpenStreakDrawer) onOpenStreakDrawer();
-            else setIsStreakDrawerOpen(true);
-          }}
         />
       )}
     </div>

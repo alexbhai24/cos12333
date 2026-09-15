@@ -1,6 +1,56 @@
 import { DailyQuestion, SubjectKey } from '../types/dailyStatus';
 
 export const DEFAULT_DAILY_QUESTIONS: Record<SubjectKey, DailyQuestion[]> = {
+  nta_q: [
+    {
+      id: 'nta_q1',
+      subject: 'nta_q',
+      topic: 'NTA Abhyas - Dual Nature of Matter',
+      difficulty: 'MEDIUM',
+      questionText: 'An electron accelerates from rest through a potential difference of V volts. The de Broglie wavelength associated with it is given by λ = :',
+      options: [
+        '\\frac{1.227}{\\sqrt{V}} \\text{ nm}',
+        '\\frac{12.27}{\\sqrt{V}} \\text{ nm}',
+        '\\frac{0.1227}{\\sqrt{V}} \\text{ nm}',
+        '\\frac{122.7}{\\sqrt{V}} \\text{ nm}'
+      ],
+      correctIndex: 0,
+      explanation: 'For an electron, \\lambda = \\frac{h}{\\sqrt{2meV}} = \\frac{12.27}{\\sqrt{V}} \\text{ Å} = \\frac{1.227}{\\sqrt{V}} \\text{ nm}.',
+      videoSolutionUrl: ''
+    },
+    {
+      id: 'nta_q2',
+      subject: 'nta_q',
+      topic: 'NTA Abhyas - Organic Chemistry',
+      difficulty: 'MEDIUM',
+      questionText: 'Which of the following compounds will undergo S_N1 reaction fastest?',
+      options: [
+        '(CH_3)_3C-Cl',
+        '(CH_3)_2CH-Cl',
+        'CH_3CH_2-Cl',
+        'CH_3-Cl'
+      ],
+      correctIndex: 0,
+      explanation: 'S_N1 reaction rate depends on the stability of carbocation intermediate. Tertiary carbocation (CH_3)_3C^+ is hyperconjugatively most stable.',
+      videoSolutionUrl: ''
+    },
+    {
+      id: 'nta_q3',
+      subject: 'nta_q',
+      topic: 'NTA Abhyas - Cell Biology',
+      difficulty: 'EASY',
+      questionText: 'Which organelle is called the "Powerhouse of the Cell" due to ATP synthesis via oxidative phosphorylation?',
+      options: [
+        'Mitochondria',
+        'Chloroplast',
+        'Golgi Apparatus',
+        'Endoplasmic Reticulum'
+      ],
+      correctIndex: 0,
+      explanation: 'Mitochondria produce cellular energy currency ATP through electron transport chain and chemiosmotic ATP synthase in inner membrane.',
+      videoSolutionUrl: ''
+    }
+  ],
   physics: [
     {
       id: 'phy_d1',

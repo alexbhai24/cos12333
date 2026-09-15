@@ -15,6 +15,7 @@ import { getChapterUnitTheme } from '../utils/flashcardUnitTheme';
 import { CsvUploader } from '../components/creator-studio/CsvUploader';
 import { TestBuilderModal } from '../components/creator-studio/TestBuilderModal';
 import { DailyStatusManagerModal } from '../components/creator-studio/DailyStatusManagerModal';
+import { AddToStatusModal } from '../components/creator-studio/AddToStatusModal';
 import { useCreatorStudioStorage } from '../hooks/useCreatorStudioStorage';
 import { CustomTest } from '../types/creatorStudio';
 import { QuestionSolutionTabs } from '../components/QuestionSolutionTabs';
@@ -1192,7 +1193,8 @@ const QuestionBank: React.FC<{
   onDuplicate: (q: Question) => void;
   onOpenTestBuilder: () => void;
   onOpenDailyStatusModal: () => void;
-}> = ({ questions, selectedQuestions, toggleSelect, toggleSelectAll, onAdd, onBulkAdd, onEdit, onDelete, onDuplicate, onOpenTestBuilder, onOpenDailyStatusModal }) => {
+  onOpenAddToStatusModal: () => void;
+}> = ({ questions, selectedQuestions, toggleSelect, toggleSelectAll, onAdd, onBulkAdd, onEdit, onDelete, onDuplicate, onOpenTestBuilder, onOpenDailyStatusModal, onOpenAddToStatusModal }) => {
   const [search, setSearch] = useState('');
   const [selectedExam, setSelectedExam] = useState<ExamType>('neet');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -1285,16 +1287,25 @@ const QuestionBank: React.FC<{
               className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-purple-300 transition-all cursor-pointer shadow-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/40 relative overflow-hidden hover-shine-effect"
             >
               <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-              <span>Daily Status Questions</span>
+              <span>Manage Status Bar</span>
             </button>
 
             {selectedQuestions.length > 0 && (
-              <button
-                onClick={onOpenTestBuilder}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black text-black transition-all cursor-pointer shadow-lg bg-emerald-400 hover:bg-emerald-300"
-              >
-                <span>Create Test ({selectedQuestions.length})</span>
-              </button>
+              <>
+                <button
+                  onClick={onOpenTestBuilder}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-black transition-all cursor-pointer shadow-lg bg-emerald-400 hover:bg-emerald-300"
+                >
+                  <span>Create Test ({selectedQuestions.length})</span>
+                </button>
+                <button
+                  onClick={onOpenAddToStatusModal}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-white transition-all cursor-pointer shadow-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 border border-purple-400/40 relative overflow-hidden hover-shine-effect"
+                >
+                  <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse" />
+                  <span>Add to Status ({selectedQuestions.length})</span>
+                </button>
+              </>
             )}
             <button
               onClick={onAdd}
@@ -1693,6 +1704,7 @@ export const CreatorPage: React.FC = () => {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [isTestBuilderOpen, setIsTestBuilderOpen] = useState(false);
   const [isDailyStatusModalOpen, setIsDailyStatusModalOpen] = useState(false);
+  const [isAddToStatusModalOpen, setIsAddToStatusModalOpen] = useState(false);
   const { tests, addTest } = useCreatorStudioStorage();
   const toggleSelect = (id: string) => {
     setSelectedQuestions(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
@@ -1793,6 +1805,7 @@ export const CreatorPage: React.FC = () => {
           onDuplicate={handleDuplicate}
           onOpenTestBuilder={() => setIsTestBuilderOpen(true)}
           onOpenDailyStatusModal={() => setIsDailyStatusModalOpen(true)}
+          onOpenAddToStatusModal={() => setIsAddToStatusModalOpen(true)}
         />
       )}
 
@@ -1813,6 +1826,14 @@ export const CreatorPage: React.FC = () => {
         <DailyStatusManagerModal
           isOpen={isDailyStatusModalOpen}
           onClose={() => setIsDailyStatusModalOpen(false)}
+        />
+      )}
+
+      {isAddToStatusModalOpen && (
+        <AddToStatusModal
+          selectedQuestions={questions.filter(q => selectedQuestions.includes(q.id))}
+          onClose={() => setIsAddToStatusModalOpen(false)}
+          onSuccess={() => setSelectedQuestions([])}
         />
       )}
     </div>

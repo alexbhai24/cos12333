@@ -1,4 +1,4 @@
-export type SubjectKey = 'physics' | 'chemistry' | 'biology' | 'mathematics';
+export type SubjectKey = 'nta_q' | 'physics' | 'chemistry' | 'biology' | 'mathematics';
 
 export interface DailyQuestion {
   id: string;
