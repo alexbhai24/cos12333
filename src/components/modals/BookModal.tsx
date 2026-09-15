@@ -3,11 +3,14 @@ import { X, BookOpen, Download, Loader2, AlertTriangle, ExternalLink, Link2 } fr
 import { useApp } from '../../context/AppContext';
 import { linkService } from '../../services/linkService';
 import { getGradeLabel } from '../../utils/gradeUtils';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export const BookModal: React.FC = () => {
   const { activeBookModal, setActiveBookModal } = useApp();
   const [loading, setLoading] = useState(true);
   const [previewError, setPreviewError] = useState(false);
+
+  useModalLock(!!activeBookModal);
 
   if (!activeBookModal) return null;
 
@@ -58,7 +61,7 @@ export const BookModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div

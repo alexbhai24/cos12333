@@ -3,9 +3,12 @@ import { X, Sparkles, Award, UserCheck, MessageSquare } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AvatarDecoration } from '../AvatarDecoration';
 import { getUserGradeOrDesignationBadge } from '../../utils/gradeUtils';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export const PublicProfileModal: React.FC = () => {
   const { publicProfileUser, setPublicProfileUser, posts } = useApp();
+
+  useModalLock(!!publicProfileUser);
 
   if (!publicProfileUser) return null;
 
@@ -21,7 +24,7 @@ export const PublicProfileModal: React.FC = () => {
       onClick={(e) => {
         if (e.target === e.currentTarget) setPublicProfileUser(null);
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div className="relative w-full max-w-md bg-[#090C22]/98 border border-[rgba(0,240,255,0.25)] rounded-3xl shadow-[0_20px_50px_rgba(0,240,255,0.25)] p-6 overflow-hidden max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         

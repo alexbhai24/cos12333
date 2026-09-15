@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Video, FileText, Sparkles } from 'lucide-react';
 import { DailyQuestion, SubjectKey } from '../types/dailyStatus';
 import { MathFormattedText } from './MathFormattedText';
@@ -23,6 +23,16 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'text' | 'video'>('text');
 
+  // Prevent background page scrolling when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const currentQ = questions[currentIndex];
@@ -46,7 +56,7 @@ export const DailyStoryModal: React.FC<DailyStoryModalProps> = ({
   const currentSubInfo = subjectTitles[subject] || { title: subject, color: 'text-cyan-400', icon: '⚡' };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-300 overflow-y-auto">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300 overflow-y-auto">
       {/* Container Phone / Story Layout */}
       <div className="relative w-full max-w-lg bg-[#0e121e] border border-white/10 rounded-3xl sm:rounded-[32px] p-4 sm:p-6 shadow-2xl space-y-4 my-auto overflow-hidden">
         

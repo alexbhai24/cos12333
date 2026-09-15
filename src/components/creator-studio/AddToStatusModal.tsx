@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Check } from 'lucide-react';
 import { Question } from '../../pages/CreatorPage';
 import { SubjectKey, DailyQuestion } from '../../types/dailyStatus';
@@ -17,6 +17,14 @@ export const AddToStatusModal: React.FC<AddToStatusModalProps> = ({
 }) => {
   const { questionsMap, saveQuestionsMap } = useDailyStatus();
   const [targetSubject, setTargetSubject] = useState<SubjectKey>('nta_q');
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, []);
 
   const channels: { key: SubjectKey; label: string; icon: string; color: string }[] = [
     { key: 'nta_q', label: 'NTA_Q (NTA Target)', icon: '🎯', color: 'text-amber-400' },
@@ -63,7 +71,7 @@ export const AddToStatusModal: React.FC<AddToStatusModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-md bg-[#121626] border border-cyan-500/30 rounded-3xl p-6 shadow-2xl space-y-6 overflow-hidden">
         
         {/* Close button */}

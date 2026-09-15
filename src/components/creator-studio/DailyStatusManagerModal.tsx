@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Sparkles, SlidersHorizontal, BookOpen } from 'lucide-react';
 import { DailyQuestion, SubjectKey } from '../../types/dailyStatus';
 import { useDailyStatus } from '../../hooks/useDailyStatus';
@@ -12,6 +12,16 @@ interface DailyStatusManagerModalProps {
 export const DailyStatusManagerModal: React.FC<DailyStatusManagerModalProps> = ({ isOpen, onClose }) => {
   const { questionsMap, saveQuestionsMap } = useDailyStatus();
   const [selectedSubject, setSelectedSubject] = useState<SubjectKey>('physics');
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, [isOpen]);
 
   // Form for adding new question
   const [showAddForm, setShowAddForm] = useState(false);
@@ -81,7 +91,7 @@ export const DailyStatusManagerModal: React.FC<DailyStatusManagerModalProps> = (
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
       <div className="relative w-full max-w-3xl bg-[#121626] border border-cyan-500/30 rounded-3xl p-6 shadow-2xl space-y-6 my-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
         
         {/* Header */}

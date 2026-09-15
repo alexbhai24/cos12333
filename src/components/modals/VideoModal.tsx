@@ -2,11 +2,14 @@ import React, { useRef, useEffect, useState } from 'react';
 import { X, Maximize, ExternalLink, Calendar, User } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { extractYoutubeId } from '../../services/videoService';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export const VideoModal: React.FC = () => {
   const { activeVideoModal, setActiveVideoModal, claimDailyStreak, showNotification, videoWatchProgress, setVideoWatchProgress } = useApp();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [streakClaimed, setStreakClaimed] = useState(false);
+
+  useModalLock(!!activeVideoModal);
 
   useEffect(() => {
     if (!activeVideoModal) {
@@ -60,7 +63,7 @@ export const VideoModal: React.FC = () => {
   return (
     <div 
       onClick={() => setActiveVideoModal(null)}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200 cursor-pointer"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200 cursor-pointer"
     >
       <div 
         onClick={(e) => e.stopPropagation()}

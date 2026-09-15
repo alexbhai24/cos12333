@@ -36,6 +36,11 @@ export const SearchModal: React.FC = () => {
   useEffect(() => {
     if (isSearchOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow || '';
+      };
     }
   }, [isSearchOpen]);
 
@@ -43,20 +48,24 @@ export const SearchModal: React.FC = () => {
 
   const q = searchQuery.toLowerCase().trim();
 
-  const matchingVideos = contentItems.filter(
-    v => v.contentType === 'video' && (!q || v.title.toLowerCase().includes(q) || v.subject.toLowerCase().includes(q))
+  const matchingVideos = MOCK_VIDEOS.filter(v => 
+    v.title.toLowerCase().includes(q) || 
+    v.subject.toLowerCase().includes(q)
   );
 
-  const matchingDocs = contentItems.filter(
-    d => (d.contentType === 'document') && (!q || d.title.toLowerCase().includes(q) || d.subject.toLowerCase().includes(q))
+  const matchingDocs = MOCK_DOCUMENTS.filter(d => 
+    d.title.toLowerCase().includes(q) || 
+    d.subject.toLowerCase().includes(q)
   );
 
-  const matchingBooks = contentItems.filter(
-    b => b.contentType === 'book' && (!q || b.title.toLowerCase().includes(q) || (b.subject || '').toLowerCase().includes(q))
+  const matchingBooks = MOCK_BOOKS.filter(b => 
+    b.title.toLowerCase().includes(q) || 
+    b.subject.toLowerCase().includes(q)
   );
 
-  const matchingTests = contentItems.filter(
-    t => t.contentType === 'test' && (!q || t.title.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q))
+  const matchingTests = MOCK_TESTS.filter(t => 
+    t.title.toLowerCase().includes(q) || 
+    t.subject.toLowerCase().includes(q)
   );
 
   const hasResults = 
@@ -72,7 +81,7 @@ export const SearchModal: React.FC = () => {
           setIsSearchOpen(false);
         }
       }}
-      className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 px-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div className="w-full max-w-xl bg-[#060918]/95 border border-[rgba(0,240,255,0.22)] rounded-3xl shadow-[0_25px_60px_rgba(0,240,255,0.15)] overflow-hidden flex flex-col max-h-[70vh] animate-in slide-in-from-top-4 duration-300">
         

@@ -364,7 +364,7 @@ export const BoneAIFAB: React.FC<BoneAIFABProps> = ({ onClick, isOpen }) => {
         bottom: hasBottomNav ? '104px' : '24px',
         x,
         y,
-        zIndex: 9999,
+        zIndex: 45,
         cursor: 'grab',
         touchAction: 'none',
       }}

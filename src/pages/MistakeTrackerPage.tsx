@@ -306,6 +306,16 @@ export const MistakeTrackerPage: React.FC = () => {
     };
   }, [isAddModalOpen, addStep, addMode]);
 
+  // Lock body scroll when modal or lightbox is open
+  useEffect(() => {
+    if (!isAddModalOpen && !lightboxImage) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, [isAddModalOpen, lightboxImage]);
+
   // Synchronize form subject & chapters when modal opens
   useEffect(() => {
     if (isAddModalOpen && validSubjects.length > 0) {
@@ -823,7 +833,7 @@ export const MistakeTrackerPage: React.FC = () => {
 
       {/* ERROR LOGGING MODAL: DOCUMENT SCANNER vs MANUAL PARAGRAPH ENTRY */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
           <div className="bg-[#0b0e1b] border border-white/20 rounded-3xl p-6 sm:p-8 max-w-2xl w-full my-6 space-y-5 shadow-2xl relative overflow-hidden">
             
             <button

@@ -233,7 +233,7 @@ export const SavedItemsModal: React.FC<SavedItemsModalProps> = ({ isOpen, onClos
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
     >
       {/* Center Screen Full Panel */}
       <div className="relative w-[95vw] max-w-5xl h-[85vh] bg-[#090C22]/98 border border-[rgba(0,240,255,0.25)] rounded-3xl shadow-[0_25px_60px_rgba(0,240,255,0.25)] p-5 sm:p-7 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">

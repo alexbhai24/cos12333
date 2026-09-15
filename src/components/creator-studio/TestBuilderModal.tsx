@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Clock, Save, Settings, ArrowRight, ArrowLeft, Palette, LayoutList, Plus, Trash2, Award } from 'lucide-react';
 import { Question } from '../../pages/CreatorPage';
@@ -104,8 +104,16 @@ export const TestBuilderModal: React.FC<TestBuilderModalProps> = ({ selectedQues
     { id: 'slate', label: 'Slate / Dark', color: '#64748b' }
   ] as const;
 
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, []);
+
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="bg-[#131726] border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in duration-200">
         
         {/* Header */}

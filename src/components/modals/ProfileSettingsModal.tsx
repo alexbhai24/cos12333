@@ -122,7 +122,7 @@ export const ProfileSettingsModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[99999] flex justify-end bg-black/70 backdrop-blur-sm">
       {/* Backdrop listener to close when clicking outside */}
       <div className="absolute inset-0 z-0" onClick={() => setIsProfileSettingsOpen(false)} />
 

@@ -113,7 +113,7 @@ export const TestModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#06101F] text-white animate-in fade-in duration-200 overflow-hidden">
+    <div className="fixed inset-0 z-[99999] flex flex-col bg-[#06101F] text-white animate-in fade-in duration-200 overflow-hidden">
       {/* Responsive Header */}
       <header className="bg-[#09182D] border-b border-[rgba(0,240,255,0.2)] px-4 py-3 md:px-6 md:py-3.5 flex items-center justify-between shadow-xl relative z-10">
         {/* Left Title */}

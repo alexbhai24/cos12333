@@ -387,10 +387,19 @@ const ScannerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     handleClose();
   };
 
+  // Lock body scroll when scanner is open
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, []);
+
   return (
     <>
       {/* Fullscreen Overlay */}
-      <div className="fixed inset-0 z-[9999] bg-[#0a0c16] flex flex-col justify-between select-none font-sans overflow-hidden">
+      <div className="fixed inset-0 z-[99999] bg-[#0a0c16] flex flex-col justify-between select-none font-sans overflow-hidden">
         
         {/* STEP 1: REAL LIVE CAMERA SCANNER VIEW (MATCHING USER SCREENSHOT IMAGE 1) */}
         {step === 1 && (

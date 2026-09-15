@@ -3,11 +3,14 @@ import { X, FileText, Download, Loader2, AlertTriangle, ExternalLink, Link2 } fr
 import { useApp } from '../../context/AppContext';
 import { linkService } from '../../services/linkService';
 import { getGradeLabel } from '../../utils/gradeUtils';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export const DocModal: React.FC = () => {
   const { activeDocModal, setActiveDocModal } = useApp();
   const [loading, setLoading] = useState(true);
   const [previewError, setPreviewError] = useState(false);
+
+  useModalLock(!!activeDocModal);
 
   if (!activeDocModal) return null;
 
@@ -60,7 +63,7 @@ export const DocModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div

@@ -12,12 +12,19 @@ export function useModalLock(isOpen: boolean): void {
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`);
 
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
     document.documentElement.classList.add('modal-open');
     document.body.classList.add('modal-open');
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
 
     return () => {
       document.documentElement.classList.remove('modal-open');
       document.body.classList.remove('modal-open');
+      document.body.style.overflow = prevBodyOverflow || '';
+      document.documentElement.style.overflow = prevHtmlOverflow || '';
       document.documentElement.style.removeProperty('--scrollbar-width');
     };
   }, [isOpen]);
