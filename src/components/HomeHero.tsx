@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles, MessageSquare, Play, Flame, Award, Cpu, BookOpen,
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { normalizeGrade } from '../utils/gradeUtils';
+import { Skeleton3DViewer } from './Skeleton3DViewer';
 
 export const HomeHero: React.FC = () => {
   const { user, setCurrentRoute, posts } = useApp();
@@ -26,8 +27,10 @@ export const HomeHero: React.FC = () => {
         />
       </div>
 
-      {/* Hero Content */}
-      <div className="relative z-20 max-w-4xl">
+      {/* Hero Content Grid with 3D Skeleton Model */}
+      <div className="relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        {/* Left Column Text & Action Buttons */}
+        <div className="lg:col-span-8">
         {/* Eyebrow badge */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <div className="inline-flex items-center space-x-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full">
@@ -134,11 +137,16 @@ export const HomeHero: React.FC = () => {
             </div>
             <div>
               <div className="text-sm font-extrabold text-white font-heading">Interactive</div>
-              <div className="text-[10px] text-gray-400">Learning Engine</div>
+              <div className="text-[10px] text-gray-400">3D Anatomy Engine</div>
             </div>
           </div>
         </div>
+        </div>
 
+        {/* Right Column Interactive 3D Skeleton Model Container */}
+        <div className="lg:col-span-4 flex items-center justify-center pointer-events-auto">
+          <Skeleton3DViewer className="w-full h-80 sm:h-[420px]" />
+        </div>
       </div>
     </div>
   );
