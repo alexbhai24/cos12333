@@ -13,6 +13,7 @@ interface BoneAIPopupProps {
 
 export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => {
   const { currentRoute, user } = useApp();
+  const activeEmail = user?.email || 'guest';
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -24,14 +25,14 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
 
   // Load history
   useEffect(() => {
-    if (view === 'history' && user?.email) {
-      chatHistoryStore.getChatsForUser(user.email).then(setSessions);
+    if (view === 'history') {
+      chatHistoryStore.getChatsForUser(activeEmail).then(setSessions);
     }
-  }, [view, user?.email]);
+  }, [view, activeEmail]);
 
   // Save messages to current session
   useEffect(() => {
-    if (messages.length > 0 && user?.email) {
+    if (messages.length > 0) {
       const sessionId = activeSessionId || `session_${Date.now()}`;
       if (!activeSessionId) setActiveSessionId(sessionId);
 
@@ -41,14 +42,14 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
 
       chatHistoryStore.saveChat({
         id: sessionId,
-        userId: user.email,
+        userId: activeEmail,
         title: sessionTitle,
         createdAt: parseInt(sessionId.split('_')[1]) || Date.now(),
         updatedAt: Date.now(),
         messages
       });
     }
-  }, [messages, activeSessionId, user?.email]);
+  }, [messages, activeSessionId, activeEmail]);
 
   const handleNewChat = () => {
     setActiveSessionId(null);
@@ -146,10 +147,8 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
       handleNewChat();
     }
     setDeleteConfirmId(null);
-    if (user?.email) {
-      const updated = await chatHistoryStore.getChatsForUser(user.email);
-      setSessions(updated);
-    }
+    const updated = await chatHistoryStore.getChatsForUser(activeEmail);
+    setSessions(updated);
   };
 
   const handleClearHistory = () => {
@@ -159,11 +158,9 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
 
   const confirmClearHistory = async () => {
     setClearConfirmOpen(false);
-    if (user?.email) {
-      await chatHistoryStore.clearAllHistory(user.email);
-      setSessions([]);
-      handleNewChat();
-    }
+    await chatHistoryStore.clearAllHistory(activeEmail);
+    setSessions([]);
+    handleNewChat();
   };
 
   const handleAddMessage = (msg: ChatMessage) => {
@@ -227,17 +224,12 @@ export const BoneAIPopup: React.FC<BoneAIPopupProps> = ({ isOpen, onClose }) => 
               {/* Check Mode Toggle Button */}
               <button
                 onClick={() => setIsCheckMode(prev => !prev)}
-                className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
-                  isCheckMode
-                    ? 'bg-cyan-500/20 text-[#00F0FF] border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.4)]'
-                    : 'bg-white/5 text-gray-400 border-white/10 hover:text-white hover:border-white/20'
-                }`}
-                title={isCheckMode ? 'Check Mode Active: Direct factual chat + Web Images + Fact check' : 'Enable Check Mode'}
+                className={`p-1.5 rounded-lg transition-colors ${isCheckMode ? 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/40' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                title={isCheckMode ? 'Check Mode ON (NVIDIA Verified) — click to disable' : 'Enable Check Mode (NVIDIA Verified)'}
+                aria-label="Toggle check mode"
               >
-                <CheckCircle2 className={`w-3.5 h-3.5 ${isCheckMode ? 'text-[#00F0FF]' : 'text-gray-400'}`} />
-                <span className="hidden sm:inline">Check</span>
+                <CheckCircle2 className="w-4 h-4" />
               </button>
-
               <button 
                 onClick={() => setView(view === 'chat' ? 'history' : 'chat')} 
                 className={`p-1.5 rounded-lg transition-colors ${view === 'history' ? 'bg-[#00F0FF]/15 text-[#00F0FF]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}

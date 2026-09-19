@@ -10,12 +10,15 @@ import {
   Copy,
   Check,
   CheckCircle2,
+  AlertTriangle,
   FileText,
   Mic,
   MicOff,
   ThumbsUp,
   ThumbsDown,
   Sparkles,
+  GraduationCap,
+  Zap,
   Search,
   BookOpen,
   Brain,
@@ -29,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ChatMessage } from '../../services/chatHistoryStore';
+import type { PostResponseCheckResult } from '../../services/aiService';
 import { aiService, shouldUseWebSearch } from '../../services/aiService';
 import { MermaidViewer } from './MermaidViewer';
 import { MessagePlusIcon } from './MessagePlusIcon';
@@ -51,10 +55,10 @@ interface BoneAIChatProps {
 }
 
 const MODES = [
-  { name: 'Level 1', desc: 'Short search answers', icon: Search, color: 'text-gray-400', border: 'border-gray-500', bg: 'bg-gray-500/10' },
-  { name: 'Level 2', desc: 'Medium responses + Web images', icon: Sparkles, color: 'text-[#00F0FF]', border: 'border-[#00F0FF]/50', bg: 'bg-[#00F0FF]/10' },
-  { name: 'Level 3', desc: 'Detailed explanations', icon: BookOpen, color: 'text-[#FFD700]', border: 'border-[#FFD700]/50', bg: 'bg-[#FFD700]/10' },
-  { name: 'Level 4', desc: 'Advanced solving + Image generation', icon: Brain, color: 'text-[#FF3366]', border: 'border-[#FF3366]/50', bg: 'bg-[#FF3366]/10' },
+  { name: 'Level 1', label: 'Smart', desc: 'Fast Smart Summarizer (Gemini Flash & Groq)', icon: Sparkles },
+  { name: 'Level 2', label: 'Flash', desc: 'Flash Q&A & Web Images', icon: Zap },
+  { name: 'Level 3', label: 'Deep', desc: 'Deep Academic Reasoning', icon: BookOpen },
+  { name: 'Level 4', label: 'Think', desc: 'Advanced Deep Thinking & Visuals', icon: Brain },
 ];
 
 const NEET_JEE_PYQ_POOL = [
@@ -123,6 +127,9 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({});
   const [openSourcesMap, setOpenSourcesMap] = useState<Record<string, boolean>>({});
+  const [isCheckingMap, setIsCheckingMap] = useState<Record<string, boolean>>({});
+  const [checkedDataMap, setCheckedDataMap] = useState<Record<string, PostResponseCheckResult>>({});
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [showVoiceMode, setShowVoiceMode] = useState(false);
@@ -139,6 +146,42 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleCheckMessage = async (msg: ChatMessage) => {
+    if (isCheckingMap[msg.id]) return;
+
+    setIsCheckingMap(prev => ({ ...prev, [msg.id]: true }));
+    setStatusState('thinking');
+    setStatusMessage('Running NVIDIA AI Verification Check...');
+
+    try {
+      const msgIndex = messages.findIndex(m => m.id === msg.id);
+      const userMsgIndex = msgIndex > 0 ? msgIndex - 1 : 0;
+      const userPrompt = messages[userMsgIndex]?.role === 'user' ? messages[userMsgIndex].content : msg.content;
+      const historyPayload = messages.slice(0, msgIndex > 0 ? msgIndex : undefined).map(m => ({ role: m.role, content: m.content }));
+
+      const result = await aiService.performPostResponseCheck(userPrompt, msg.content, historyPayload);
+
+      onUpdateMessage(msg.id, {
+        isVerified: true,
+        webImages: result.webImages && result.webImages.length > 0 ? result.webImages : msg.webImages,
+        citations: result.citations && result.citations.length > 0 ? result.citations : msg.citations,
+      });
+
+      setCheckedDataMap(prev => ({ ...prev, [msg.id]: result }));
+      setStatusState('completed');
+    } catch (err) {
+      console.warn('[handleCheckMessage] Error:', err);
+      setStatusState('error');
+    } finally {
+      setIsCheckingMap(prev => ({ ...prev, [msg.id]: false }));
+      setTimeout(() => setStatusMessage(null), 2500);
+    }
+  };
+
+  const handleLikeClick = (msgId: string) => {
+    setFeedback(prev => ({ ...prev, [msgId]: prev[msgId] === 'up' ? undefined as any : 'up' }));
+  };
 
   // Dynamic Auto-Resizing Textarea for Multi-Line Input
   useEffect(() => {
@@ -203,7 +246,8 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
         img.src = svgUrl;
       });
 
-      const scaleFactor = 20; // 20x resolution for massive ultra-HD quality
+      const maxDim = Math.max(width + padding * 2, height + padding * 2);
+      const scaleFactor = Math.max(1, Math.min(3, Math.floor(4096 / maxDim))); // Safe HD resolution
       const canvas = document.createElement('canvas');
       canvas.width = (width + padding * 2) * scaleFactor;
       canvas.height = (height + padding * 2) * scaleFactor;
@@ -966,92 +1010,153 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
             </div>
           </div>
         ) : (
-          messages.map(msg => (
-            <div key={msg.id} className="space-y-1">
-              {msg.role === 'user' ? (
-                /* User Message — CosmicBone Cyan Glow Bubble */
-                <div className="flex justify-end">
-                  <div className="max-w-[82%] bg-[var(--color-cyan)]/15 border border-[var(--color-cyan)]/35 text-white rounded-[20px] rounded-tr-md px-4 py-3 shadow-[0_4px_20px_rgba(0,240,255,0.08)]">
-                    {msg.image && (
-                      <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
-                        <img src={msg.image} alt="Upload" className="max-h-40 w-auto object-contain" />
-                      </div>
-                    )}
-                    {(msg as any).filename && (
-                      <div className="flex items-center space-x-1.5 text-xs text-[#00F0FF] mb-1 font-mono">
-                        <FileText className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[180px]">{(msg as any).filename}</span>
-                      </div>
-                    )}
-                    <p className="text-[12px] text-gray-100 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                  </div>
-                </div>
-              ) : (
-                /* Assistant Message — Copilot / Search Image Gallery style left-aligned */
-                <div className="flex justify-start">
-                  <div className="w-full space-y-2 py-1">
+          (() => {
+            const assistantMessages = messages.filter(m => m.role === 'assistant');
+            const lastAssistantMsgId = assistantMessages[assistantMessages.length - 1]?.id;
 
-                    {/* Verified by NVIDIA Check Mode Badge */}
-                    {(msg.isVerified || isCheckMode) && msg.content !== '...' && (
-                      <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shadow-[0_0_12px_rgba(16,185,129,0.2)] mb-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
-                        <span>Verified by NVIDIA AI Check</span>
-                      </div>
-                    )}
-
-                    {/* Web Images Carousel / Gallery matching user Image 4 */}
-                    {msg.webImages && msg.webImages.length > 0 && (
-                      <div className="flex items-center space-x-3 overflow-x-auto pb-2 pt-1 my-1.5 scrollbar-none snap-x">
-                        {msg.webImages.map((imgUrl, imgIdx) => (
-                          <div 
-                            key={imgIdx} 
-                            className="shrink-0 w-32 sm:w-40 h-28 sm:h-32 rounded-2xl overflow-hidden border border-white/10 bg-[#0a1120] shadow-xl group relative snap-start"
-                          >
-                            <img 
-                              src={imgUrl} 
-                              alt={`Web Visual Reference ${imgIdx + 1}`} 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                              onError={(e) => {
-                                (e.target as HTMLElement).parentElement!.style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="text-[12px] text-gray-200 leading-relaxed select-text space-y-1">
-                      {renderFormattedText(msg.content)}
+            return messages.map(msg => (
+              <div key={msg.id} className="space-y-1">
+                {msg.role === 'user' ? (
+                  /* User Message — CosmicBone Cyan Glow Bubble */
+                  <div className="flex justify-end">
+                    <div className="max-w-[82%] bg-[var(--color-cyan)]/15 border border-[var(--color-cyan)]/35 text-white rounded-[20px] rounded-tr-md px-4 py-3 shadow-[0_4px_20px_rgba(0,240,255,0.08)]">
+                      {msg.image && (
+                        <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
+                          <img src={msg.image} alt="Upload" className="max-h-40 w-auto object-contain" />
+                        </div>
+                      )}
+                      {(msg as any).filename && (
+                        <div className="flex items-center space-x-1.5 text-xs text-[#00F0FF] mb-1 font-mono">
+                          <FileText className="w-3.5 h-3.5" />
+                          <span className="truncate max-w-[180px]">{(msg as any).filename}</span>
+                        </div>
+                      )}
+                      <p className="text-[12px] text-gray-100 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                     </div>
+                  </div>
+                ) : (
+                  /* Assistant Message — Copilot / Search Image Gallery style left-aligned */
+                  <div className="flex justify-start">
+                    <div className="w-full space-y-2 py-1">
 
-                    {/* Action Bar & Single "Sources" Button matching user Image 1 */}
-                    {msg.content !== '...' && (
-                      <div className="flex flex-col space-y-2 pt-2 border-t border-white/5">
-                        <div className="flex items-center justify-between">
-                          {/* Single "Sources" Button on Left */}
-                          {msg.citations && msg.citations.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => setOpenSourcesMap(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                              className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all shadow-md border ${
-                                openSourcesMap[msg.id] 
-                                  ? 'bg-[#00F0FF]/15 border-[#00F0FF]/50 text-[#00F0FF]' 
-                                  : 'bg-[#222533] hover:bg-[#2e3244] border-white/10 text-gray-200'
-                              }`}
+                      {/* Web Images Carousel / Gallery with Click Lightbox Zoom */}
+                      {msg.webImages && msg.webImages.length > 0 && (
+                        <div className="flex items-center space-x-3 overflow-x-auto pb-2 pt-1 my-1.5 scrollbar-none snap-x">
+                          {msg.webImages.map((imgUrl, imgIdx) => (
+                            <div 
+                              key={imgIdx} 
+                              onClick={() => setZoomImageUrl(imgUrl)}
+                              className="shrink-0 w-32 sm:w-40 h-28 sm:h-32 rounded-2xl overflow-hidden border border-white/10 bg-[#0a1120] shadow-xl group relative snap-start cursor-pointer hover:border-[#00F0FF]/50 transition-all"
+                              title="Click to zoom picture"
                             >
-                              <Sparkles className="w-3.5 h-3.5 text-[#00F0FF]" />
-                              <span>Sources</span>
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openSourcesMap[msg.id] ? 'rotate-180' : ''}`} />
-                            </button>
-                          ) : <div />}
+                              <img 
+                                src={imgUrl} 
+                                alt={`Web Visual Reference ${imgIdx + 1}`} 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).parentElement!.style.display = 'none';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Maximize2 className="w-5 h-5 text-[#00F0FF]" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                          {/* Right-aligned Actions & Mode Badge */}
-                          <div className="flex items-center space-x-1.5">
-                            {/* Feedback Thumbs */}
+                      <div className="text-[12px] text-gray-200 leading-relaxed select-text space-y-1">
+                        {renderFormattedText(msg.content)}
+                      </div>
+
+                      {/* Action Bar & Single "Sources" Button matching user Image 1 */}
+                      {msg.content !== '...' && (
+                        <div className="flex flex-col space-y-2 pt-2 border-t border-white/5">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            {/* Single "Sources" Button on Left */}
+                            {msg.citations && msg.citations.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => setOpenSourcesMap(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all shadow-md border ${
+                                  openSourcesMap[msg.id] 
+                                    ? 'bg-[#00F0FF]/15 border-[#00F0FF]/50 text-[#00F0FF]' 
+                                    : 'bg-[#222533] hover:bg-[#2e3244] border-white/10 text-gray-200'
+                                }`}
+                              >
+                                <Sparkles className="w-3.5 h-3.5 text-[#00F0FF]" />
+                                <span>Sources</span>
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openSourcesMap[msg.id] ? 'rotate-180' : ''}`} />
+                              </button>
+                            ) : <div />}
+
+                            {/* Right-aligned Actions & Post-Response Check Mode Button */}
+                            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                              {/* Post-Response Check Mode Button */}
+                              {(() => {
+                                const isVerified = msg.isVerified || Boolean(checkedDataMap[msg.id]);
+                                const isLastAssistant = msg.id === lastAssistantMsgId;
+                                const isChecking = Boolean(isCheckingMap[msg.id]);
+                                const isIssueFound = checkedDataMap[msg.id]?.auditPoints?.some(p => p.status === 'warning') || (checkedDataMap[msg.id] && !checkedDataMap[msg.id]?.isVerified);
+
+                                if (isVerified) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={true}
+                                      className="flex items-center justify-center p-1.5 rounded-full border shadow-sm bg-emerald-500/20 border-emerald-500/50 text-emerald-400 cursor-default opacity-90 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                                      title="Verified by NVIDIA AI Check (Completed)"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                                    </button>
+                                  );
+                                }
+
+                                if (isLastAssistant) {
+                                  if (isChecking) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={true}
+                                        className="flex items-center justify-center p-1.5 rounded-full border shadow-sm bg-[#222533] border-[#00F0FF]/40 text-[#00F0FF]"
+                                        title="Auditing response with NVIDIA AI..."
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 animate-spin text-[#00F0FF]" />
+                                      </button>
+                                    );
+                                  }
+                                  if (isIssueFound) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCheckMessage(msg)}
+                                        className="flex items-center justify-center p-1.5 rounded-full border shadow-sm bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30 transition-all cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.25)]"
+                                        title="Alert: Issue identified. Click to self-fix response."
+                                      >
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                                      </button>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCheckMessage(msg)}
+                                      className="flex items-center justify-center p-1.5 rounded-full border shadow-sm bg-[#222533] hover:bg-[#2e3244] border-white/10 text-gray-300 hover:text-[#00F0FF] hover:border-[#00F0FF]/40 transition-all cursor-pointer"
+                                      title="Run 7-Point NVIDIA Verification Audit"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-gray-400 hover:text-[#00F0FF]" />
+                                    </button>
+                                  );
+                                }
+
+                                return null;
+                              })()}
+
+                            {/* Feedback Thumbs Up (Like) */}
                             <button
                               type="button"
-                              onClick={() => setFeedback(prev => ({ ...prev, [msg.id]: 'up' }))}
+                              onClick={() => handleLikeClick(msg.id)}
                               className={`p-1.5 rounded-lg transition-colors ${feedback[msg.id] === 'up' ? 'text-[#00F0FF] bg-[#00F0FF]/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                               title="Helpful"
                             >
@@ -1085,14 +1190,17 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
                             </button>
 
                             {/* Mode Badge */}
-                            {msg.mode && (
-                              <span className={`text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-md border ${MODES.find(m => m.name === msg.mode)?.bg || 'bg-white/5'
-                                } ${MODES.find(m => m.name === msg.mode)?.color || 'text-gray-400'
-                                } ${MODES.find(m => m.name === msg.mode)?.border || 'border-white/5'
-                                }`}>
-                                {msg.mode}
-                              </span>
-                            )}
+                            {msg.mode && (() => {
+                              const mConfig = MODES.find(m => m.name === msg.mode);
+                              const labelText = mConfig?.label || msg.mode;
+                              const IconComp = mConfig?.icon || GraduationCap;
+                              return (
+                                <span className="inline-flex items-center space-x-1 text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-md border bg-white/5 border-white/5 text-gray-400">
+                                  <IconComp className="w-3 h-3 text-gray-400" />
+                                  <span>{labelText}</span>
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -1145,8 +1253,8 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
                       </div>
                     )}
 
-                    {/* Interactive Follow-up Question Chips */}
-                    {msg.followUpSuggestions && msg.followUpSuggestions.length > 0 && msg.content !== '...' && (
+                    {/* Interactive Follow-up Question Chips (Shown only when Helpful/ThumbsUp is pressed) */}
+                    {msg.followUpSuggestions && msg.followUpSuggestions.length > 0 && msg.content !== '...' && feedback[msg.id] === 'up' && (
                       <div className="mt-2.5 pt-2 border-t border-white/5 space-y-1.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Suggested Follow-ups</span>
                         <div className="flex flex-wrap gap-1.5">
@@ -1168,8 +1276,9 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
                 </div>
               )}
             </div>
-          ))
-        )}
+          ));
+        })()
+      )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -1419,19 +1528,22 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
                   </AnimatePresence>
                 </div>
 
-                {/* Think Toggle Button */}
-                <button
-                  type="button"
-                  onClick={cycleMode}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border ${MODES.find(m => m.name === mode)?.bg || 'bg-white/[0.06]'
-                    } ${MODES.find(m => m.name === mode)?.color || 'text-gray-300'
-                    } ${MODES.find(m => m.name === mode)?.border || 'border-white/[0.08]'
-                    } focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00F0FF]`}
-                  title={`Current Mode: ${mode} - ${MODES.find(m => m.name === mode)?.desc} (Click to change)`}
-                >
-                  <Brain className="w-3.5 h-3.5" />
-                  <span>Think</span>
-                </button>
+                {/* Fixed-size Classic Mode Toggle Button */}
+                {(() => {
+                  const currentMode = MODES.find(m => m.name === mode) || MODES[0];
+                  const IconComp = currentMode.icon;
+                  return (
+                    <button
+                      type="button"
+                      onClick={cycleMode}
+                      className="flex items-center justify-center space-x-1.5 h-8 w-[86px] rounded-full text-[12px] font-medium transition-all bg-white/[0.06] text-gray-300 hover:text-white hover:bg-white/[0.1] border border-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00F0FF] shadow-sm select-none"
+                      title={`Current Mode: ${currentMode.name} (${currentMode.label}) - ${currentMode.desc} (Click to change)`}
+                    >
+                      <IconComp className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                      <span className="truncate">{currentMode.label}</span>
+                    </button>
+                  );
+                })()}
               </div>
 
               {/* Right: Voice Equalizer / Cancel Stop / Send */}
@@ -1557,6 +1669,41 @@ export const BoneAIChat: React.FC<BoneAIChatProps> = ({
                   Close
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Picture Zoom Lightbox Modal */}
+      <AnimatePresence>
+        {zoomImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+            onClick={() => setZoomImageUrl(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative max-w-4xl max-h-[85vh] rounded-3xl overflow-hidden border border-white/20 bg-[#080d1a] shadow-2xl p-2 flex flex-col items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setZoomImageUrl(null)}
+                className="absolute top-4 right-4 z-20 p-2 rounded-full bg-black/70 text-white hover:bg-red-500/80 transition-colors border border-white/10 shadow-lg"
+                title="Close image"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={zoomImageUrl}
+                alt="Zoomed Reference Visual"
+                className="max-w-full max-h-[78vh] object-contain rounded-2xl"
+              />
             </motion.div>
           </motion.div>
         )}

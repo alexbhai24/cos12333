@@ -166,34 +166,34 @@ export const BoneAIPage: React.FC = () => {
             <Menu className="w-6 h-6 stroke-[1.5]" />
           </button>
 
-          <div className="flex items-center space-x-2">
-            {/* Check Mode Toggle Button */}
+          {/* Check Mode Toggle */}
+          {!isSidebarCollapsed && (
             <button
               onClick={() => setIsCheckMode(prev => !prev)}
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+              className={`p-2 rounded-xl transition-all ${
                 isCheckMode
-                  ? 'bg-cyan-500/20 text-[#00F0FF] border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.4)]'
-                  : 'bg-white/5 text-gray-400 border-white/10 hover:text-white hover:border-white/20'
+                  ? 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/40 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                  : 'bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/5'
               }`}
-              title={isCheckMode ? 'Check Mode Active: Direct factual chat + Web Images + Fact check' : 'Enable Check Mode'}
+              title={isCheckMode ? 'Check Mode ON (NVIDIA Verified) — click to disable' : 'Enable Check Mode (NVIDIA Verified)'}
+              aria-label="Toggle check mode"
             >
-              <CheckCircle2 className={`w-4 h-4 ${isCheckMode ? 'text-[#00F0FF]' : 'text-gray-400'}`} />
-              <span className={isSidebarCollapsed ? 'hidden' : 'inline'}>Check</span>
+              <CheckCircle2 className="w-4 h-4" />
             </button>
+          )}
 
-            {/* New Conversation Button */}
-            <button
-              onClick={() => {
-                handleNewChat();
-                setIsMobileSidebarOpen(false);
-              }}
-              className="w-9 h-9 rounded-full bg-[#272930] hover:bg-[#343740] border border-white/10 flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95 shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00F0FF]"
-              title="New conversation"
-              aria-label="New conversation"
-            >
-              <MessagePlusIcon className="w-5 h-5" size={19} />
-            </button>
-          </div>
+          {/* New Conversation Button */}
+          <button
+            onClick={() => {
+              handleNewChat();
+              setIsMobileSidebarOpen(false);
+            }}
+            className="w-9 h-9 rounded-full bg-[#272930] hover:bg-[#343740] border border-white/10 flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95 shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00F0FF]"
+            title="New conversation"
+            aria-label="New conversation"
+          >
+            <MessagePlusIcon className="w-5 h-5" size={19} />
+          </button>
         </div>
 
         {/* Separator when collapsed */}

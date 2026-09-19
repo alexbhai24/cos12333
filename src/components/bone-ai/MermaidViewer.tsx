@@ -38,7 +38,8 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ chart }) => {
       try {
         setError(null);
         const cleanChart = chart.trim();
-        const { svg } = await mermaid.render(chartId.current, cleanChart);
+        const uniqueId = `mermaid_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
+        const { svg } = await mermaid.render(uniqueId, cleanChart);
         if (isMounted) {
           setSvgContent(svg);
         }
